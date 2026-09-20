@@ -1,0 +1,28 @@
+services:
+  # Backend Python (Flask)
+  - type: web
+    name: gameplay-backend
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && gunicorn app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: MONGO_URI
+        sync: false # User must set this in Render dashboard
+      - key: FLASK_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://gameplay-frontend.onrender.com # Change this if frontend name changes
+
+  # Frontend React
+  - type: web
+    name: gameplay-frontend
+    env: node
+    buildCommand: "cd frontend && npm install && npm run build"
+    startCommand: "cd frontend && npx serve -s build"
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: REACT_APP_API_BASE
+        value: https://gameplay-backend.onrender.com # Change this if backend name changes
