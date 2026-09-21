@@ -12,7 +12,8 @@ import ImageModal from "./components/ImageModal";
 import PythonTerminal from "./components/PythonTerminal";
 import InventoryPanel from "./components/InventoryPanel";
 import Mission2 from "./components/Mission2";
-import { getState, saveState, addClue } from "./api";
+import LoginScreen from "./components/LoginScreen";
+import { getState, saveState, addClue, setPlayerId } from "./api";
 
 const OBJECTS = {
   laptop:  { x: 79, y: 60, label: "Interagir (Laptop)" },
@@ -320,7 +321,17 @@ function Mission1({ onComplete, onQuit, onGoToMission2, sharedInventory, setShar
         <TextModal title="Photo" lines={["Une vieille photo. Adam, plus jeune, souriant.", "« Il devait être pressé... »"]} onClose={closeModal} />
       )}
       {activeModal === "carnet" && (
-        <TextModal title="Carnet" lines={["Des pages remplies de croquis et d'annotations illisibles.", "Certaines lignes sont barrées avec insistance."]} onClose={closeModal} />
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ padding: 0, overflow: "hidden", background: "#000", border: "1px solid rgba(255,255,255,0.12)", maxWidth: 650 }}>
+            <div style={{ background: "#1a1d24", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em" }}>CARNET D'ADAM</span>
+            </div>
+            <img src={require("./assets/ChatGPT Image 21 sept. 2026, 22_44_54.png")} alt="Carnet d'Adam" style={{ width: "100%", display: "block", maxHeight: "70vh", objectFit: "contain" }} />
+            <div className="modal-footer" style={{ background: "#0d0f16", padding: "16px 20px" }}>
+              <button className="btn-primary" onClick={closeModal}>Fermer</button>
+            </div>
+          </div>
+        </div>
       )}
       {activeModal === "phone-sequence" && (
         <PhoneSequence onComplete={handlePhoneSequenceComplete} />
@@ -337,10 +348,20 @@ function Mission1({ onComplete, onQuit, onGoToMission2, sharedInventory, setShar
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen]           = useState("menu");
+  const [playerName, setPlayerName]   = useState(() => localStorage.getItem("player_id") || "");
   const [completedMissions, setCompleted] = useState(new Set());
   // Shared inventory travels across missions
   const [sharedInventory, setSharedInventory] = useState([]);
   
+  function handleLogin(name) {
+    setPlayerId(name);
+    setPlayerName(name);
+  }
+
+  // Show name screen if no player name yet
+  if (!playerName) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
   const appAudioRef = useRef(null);
 
   // App-level music (Menu, Chapters, Mission 2)
