@@ -350,22 +350,14 @@ export default function App() {
   const [screen, setScreen]           = useState("menu");
   const [playerName, setPlayerName]   = useState(() => localStorage.getItem("player_id") || "");
   const [completedMissions, setCompleted] = useState(new Set());
-  // Shared inventory travels across missions
   const [sharedInventory, setSharedInventory] = useState([]);
-  
-  function handleLogin(name) {
-    setPlayerId(name);
-    setPlayerName(name);
-  }
-
-  // Show name screen if no player name yet
-  if (!playerName) {
-    return <LoginScreen onLogin={handleLogin} />;
-  }
   const appAudioRef = useRef(null);
 
   // App-level music (Menu, Chapters, Mission 2)
   useEffect(() => {
+    // Don't play music on login screen
+    if (!playerName) return;
+
     const isAppMusicScreen = screen === "menu" || screen === "chapters" || screen === "mission2";
     
     if (isAppMusicScreen) {
@@ -382,8 +374,6 @@ export default function App() {
         };
         play();
         document.addEventListener("click", play, { once: true });
-        
-        // Save the listener so we can remove it later if needed
         audio.dataset.hasListener = "true";
       }
     } else {
@@ -392,9 +382,10 @@ export default function App() {
         appAudioRef.current = null;
       }
     }
-  }, [screen]);
+  }, [screen, playerName]);
 
   useEffect(() => {
+    if (!playerName) return; // Don't load state until we have a player
     (async () => {
       const state = await getState();
       if (state && state.mission_completed) {
@@ -404,10 +395,20 @@ export default function App() {
         setSharedInventory([{ id: "code-doiron", icon: "DOC", name: "Code déchiffré", detail: "DOIRON" }]);
       }
     })();
-  }, []);
+  }, [playerName]); // re-runs when player changes
+
+  function handleLogin(name) {
+    setPlayerId(name);
+    setPlayerName(name);
+  }
 
   function handleMissionComplete(missionId) {
     setCompleted(prev => new Set([...prev, missionId]));
+  }
+
+  // Show name screen if no player name yet — AFTER all hooks
+  if (!playerName) {
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   if (screen === "menu") {
