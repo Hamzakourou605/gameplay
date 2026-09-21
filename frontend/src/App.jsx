@@ -349,15 +349,13 @@ function Mission1({ onComplete, onQuit, onGoToMission2, sharedInventory, setShar
 export default function App() {
   const [screen, setScreen]           = useState("menu");
   const [playerName, setPlayerName]   = useState(() => localStorage.getItem("player_id") || "");
+  const [pendingMission, setPendingMission] = useState(null); // mission waiting for name entry
   const [completedMissions, setCompleted] = useState(new Set());
   const [sharedInventory, setSharedInventory] = useState([]);
   const appAudioRef = useRef(null);
 
   // App-level music (Menu, Chapters, Mission 2)
   useEffect(() => {
-    // Don't play music on login screen
-    if (!playerName) return;
-
     const isAppMusicScreen = screen === "menu" || screen === "chapters" || screen === "mission2";
     
     if (isAppMusicScreen) {
@@ -366,15 +364,11 @@ export default function App() {
         audio.loop = true;
         audio.volume = 0.15;
         appAudioRef.current = audio;
-        
         const play = () => {
-          if (appAudioRef.current === audio) {
-            audio.play().catch(() => {});
-          }
+          if (appAudioRef.current === audio) audio.play().catch(() => {});
         };
         play();
         document.addEventListener("click", play, { once: true });
-        audio.dataset.hasListener = "true";
       }
     } else {
       if (appAudioRef.current) {
@@ -382,10 +376,10 @@ export default function App() {
         appAudioRef.current = null;
       }
     }
-  }, [screen, playerName]);
+  }, [screen]);
 
   useEffect(() => {
-    if (!playerName) return; // Don't load state until we have a player
+    if (!playerName) return;
     (async () => {
       const state = await getState();
       if (state && state.mission_completed) {
@@ -395,27 +389,42 @@ export default function App() {
         setSharedInventory([{ id: "code-doiron", icon: "DOC", name: "Code déchiffré", detail: "DOIRON" }]);
       }
     })();
-  }, [playerName]); // re-runs when player changes
+  }, [playerName]);
 
   function handleLogin(name) {
     setPlayerId(name);
     setPlayerName(name);
+    // After entering name, launch the pending mission
+    if (pendingMission) {
+      setScreen(pendingMission);
+      setPendingMission(null);
+    }
+  }
+
+  // Called when the player selects a mission
+  function handleSelectMission(missionId) {
+    if (!playerName) {
+      // Ask for name first, remember which mission to launch after
+      setPendingMission(missionId);
+    } else {
+      setScreen(missionId);
+    }
   }
 
   function handleMissionComplete(missionId) {
     setCompleted(prev => new Set([...prev, missionId]));
   }
 
-  // Show name screen if no player name yet — AFTER all hooks
-  if (!playerName) {
+  // Show name entry overlay if player hasn't entered a name and tried to start a mission
+  if (pendingMission && !playerName) {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
   if (screen === "menu") {
-    return <MainMenu onPlay={() => setScreen("mission1")} onChapters={() => setScreen("chapters")} />;
+    return <MainMenu onPlay={() => handleSelectMission("mission1")} onChapters={() => setScreen("chapters")} />;
   }
   if (screen === "chapters") {
-    return <ChaptersScreen completedMissions={completedMissions} onSelectMission={(id) => setScreen(id)} onBack={() => setScreen("menu")} />;
+    return <ChaptersScreen completedMissions={completedMissions} onSelectMission={handleSelectMission} onBack={() => setScreen("menu")} />;
   }
   if (screen === "mission1") {
     return (
