@@ -1,14 +1,5 @@
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
-let currentPlayerId = localStorage.getItem("player_id") || "guest";
-
-export function setPlayerId(id) {
-  currentPlayerId = id;
-  localStorage.setItem("player_id", id);
-}
-
-export function getPlayerId() {
-  return currentPlayerId;
-}
+const PLAYER_ID = "yanis_default";
 
 async function safeFetch(url, options) {
   try {
@@ -22,14 +13,14 @@ async function safeFetch(url, options) {
 }
 
 export function getState() {
-  return safeFetch(`${API_BASE}/api/state?player_id=${currentPlayerId}`);
+  return safeFetch(`${API_BASE}/api/state?player_id=${PLAYER_ID}`);
 }
 
 export function saveState(partialState) {
   return safeFetch(`${API_BASE}/api/state`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ player_id: currentPlayerId, ...partialState }),
+    body: JSON.stringify({ player_id: PLAYER_ID, ...partialState }),
   });
 }
 
@@ -37,7 +28,7 @@ export function addClue(clue) {
   return safeFetch(`${API_BASE}/api/clue`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ player_id: currentPlayerId, ...clue }),
+    body: JSON.stringify({ player_id: PLAYER_ID, ...clue }),
   });
 }
 
@@ -45,6 +36,6 @@ export function resetProgress() {
   return safeFetch(`${API_BASE}/api/reset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ player_id: currentPlayerId }),
+    body: JSON.stringify({ player_id: PLAYER_ID }),
   });
 }

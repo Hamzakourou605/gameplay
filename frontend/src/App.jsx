@@ -12,8 +12,7 @@ import ImageModal from "./components/ImageModal";
 import PythonTerminal from "./components/PythonTerminal";
 import InventoryPanel from "./components/InventoryPanel";
 import Mission2 from "./components/Mission2";
-import LoginScreen from "./components/LoginScreen";
-import { getState, saveState, addClue, setPlayerId } from "./api";
+import { getState, saveState, addClue } from "./api";
 
 const OBJECTS = {
   laptop:  { x: 79, y: 60, label: "Interagir (Laptop)" },
@@ -321,17 +320,7 @@ function Mission1({ onComplete, onQuit, onGoToMission2, sharedInventory, setShar
         <TextModal title="Photo" lines={["Une vieille photo. Adam, plus jeune, souriant.", "« Il devait être pressé... »"]} onClose={closeModal} />
       )}
       {activeModal === "carnet" && (
-        <div className="modal-overlay">
-          <div className="modal-box" style={{ padding: 0, overflow: "hidden", background: "#000", border: "1px solid rgba(255,255,255,0.12)", maxWidth: 650 }}>
-            <div style={{ background: "#1a1d24", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em" }}>CARNET D'ADAM</span>
-            </div>
-            <img src={require("./assets/ChatGPT Image 21 sept. 2026, 22_44_54.png")} alt="Carnet d'Adam" style={{ width: "100%", display: "block", maxHeight: "70vh", objectFit: "contain" }} />
-            <div className="modal-footer" style={{ background: "#0d0f16", padding: "16px 20px" }}>
-              <button className="btn-primary" onClick={closeModal}>Fermer</button>
-            </div>
-          </div>
-        </div>
+        <ImageModal imageSrc={require("./assets/carnet_image.png")} onClose={closeModal} />
       )}
       {activeModal === "phone-sequence" && (
         <PhoneSequence onComplete={handlePhoneSequenceComplete} />
@@ -348,10 +337,10 @@ function Mission1({ onComplete, onQuit, onGoToMission2, sharedInventory, setShar
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen]           = useState("menu");
-  const [playerName, setPlayerName]   = useState(() => localStorage.getItem("player_id") || "");
-  const [pendingMission, setPendingMission] = useState(null); // mission waiting for name entry
   const [completedMissions, setCompleted] = useState(new Set());
+  // Shared inventory travels across missions
   const [sharedInventory, setSharedInventory] = useState([]);
+  
   const appAudioRef = useRef(null);
 
   // App-level music (Menu, Chapters, Mission 2)
@@ -364,11 +353,17 @@ export default function App() {
         audio.loop = true;
         audio.volume = 0.15;
         appAudioRef.current = audio;
+        
         const play = () => {
-          if (appAudioRef.current === audio) audio.play().catch(() => {});
+          if (appAudioRef.current === audio) {
+            audio.play().catch(() => {});
+          }
         };
         play();
         document.addEventListener("click", play, { once: true });
+        
+        // Save the listener so we can remove it later if needed
+        audio.dataset.hasListener = "true";
       }
     } else {
       if (appAudioRef.current) {
@@ -379,7 +374,6 @@ export default function App() {
   }, [screen]);
 
   useEffect(() => {
-    if (!playerName) return;
     (async () => {
       const state = await getState();
       if (state && state.mission_completed) {
@@ -389,42 +383,17 @@ export default function App() {
         setSharedInventory([{ id: "code-doiron", icon: "DOC", name: "Code déchiffré", detail: "DOIRON" }]);
       }
     })();
-  }, [playerName]);
-
-  function handleLogin(name) {
-    setPlayerId(name);
-    setPlayerName(name);
-    // After entering name, launch the pending mission
-    if (pendingMission) {
-      setScreen(pendingMission);
-      setPendingMission(null);
-    }
-  }
-
-  // Called when the player selects a mission
-  function handleSelectMission(missionId) {
-    if (!playerName) {
-      // Ask for name first, remember which mission to launch after
-      setPendingMission(missionId);
-    } else {
-      setScreen(missionId);
-    }
-  }
+  }, []);
 
   function handleMissionComplete(missionId) {
     setCompleted(prev => new Set([...prev, missionId]));
   }
 
-  // Show name entry overlay if player hasn't entered a name and tried to start a mission
-  if (pendingMission && !playerName) {
-    return <LoginScreen onLogin={handleLogin} />;
-  }
-
   if (screen === "menu") {
-    return <MainMenu onPlay={() => handleSelectMission("mission1")} onChapters={() => setScreen("chapters")} />;
+    return <MainMenu onPlay={() => setScreen("mission1")} onChapters={() => setScreen("chapters")} />;
   }
   if (screen === "chapters") {
-    return <ChaptersScreen completedMissions={completedMissions} onSelectMission={handleSelectMission} onBack={() => setScreen("menu")} />;
+    return <ChaptersScreen completedMissions={completedMissions} onSelectMission={(id) => setScreen(id)} onBack={() => setScreen("menu")} />;
   }
   if (screen === "mission1") {
     return (
