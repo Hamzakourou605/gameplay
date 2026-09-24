@@ -318,7 +318,7 @@ function Mission1({ onComplete, onQuit, onGoToMission2, sharedInventory, setShar
         <ImageModal imageSrc={require("./assets/radio.png")} onClose={closeModal} />
       )}
       {activeModal === "photo" && (
-        <TextModal title="Photo" lines={["Une vieille photo. Adam, plus jeune, souriant.", "« Il devait être pressé... »"]} onClose={closeModal} />
+        <ImageModal imageSrc={require("./assets/picture.jpg")} onClose={closeModal} />
       )}
       {activeModal === "carnet" && (
         <ImageModal imageSrc={require("./assets/carnet_image.png")} onClose={closeModal} />
