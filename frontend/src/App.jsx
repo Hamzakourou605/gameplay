@@ -12,6 +12,7 @@ import ImageModal from "./components/ImageModal";
 import PythonTerminal from "./components/PythonTerminal";
 import InventoryPanel from "./components/InventoryPanel";
 import Mission2 from "./components/Mission2";
+import Mission1Intro from "./components/Mission1Intro";
 import { getState, saveState, addClue } from "./api";
 
 const OBJECTS = {
@@ -390,10 +391,19 @@ export default function App() {
   }
 
   if (screen === "menu") {
-    return <MainMenu onPlay={() => setScreen("mission1")} onChapters={() => setScreen("chapters")} />;
+    return <MainMenu onPlay={() => setScreen("mission1_intro")} onChapters={() => setScreen("chapters")} />;
   }
   if (screen === "chapters") {
-    return <ChaptersScreen completedMissions={completedMissions} onSelectMission={(id) => setScreen(id)} onBack={() => setScreen("menu")} />;
+    return (
+      <ChaptersScreen 
+        completedMissions={completedMissions} 
+        onSelectMission={(id) => setScreen(id === "mission1" ? "mission1_intro" : id)} 
+        onBack={() => setScreen("menu")} 
+      />
+    );
+  }
+  if (screen === "mission1_intro") {
+    return <Mission1Intro onComplete={() => setScreen("mission1")} />;
   }
   if (screen === "mission1") {
     return (
