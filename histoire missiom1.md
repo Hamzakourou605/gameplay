@@ -34,6 +34,12 @@ Yanis se précipite vers l'appartement d'Adam avant que le piège ne se referme.
 
 ---
 
+### Scène 3 : La Découverte (Vidéo `0924(1).mp4`)
+* **Vidéo :** `frontend/src/assets/scemes/0924(1).mp4`
+* La vidéo se lance de manière fluide après la scène 2.
+
+---
+
 ### Écran Noir & Bascule Ominieuse
 * La vidéo s'éteint, laissant place à un **écran noir total pendant 1 seconde**.
 * Un texte saisissant apparaît au centre de l'obscurité :

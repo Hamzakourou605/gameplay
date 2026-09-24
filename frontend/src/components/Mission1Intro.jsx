@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "./Mission1Intro.css";
 
 export default function Mission1Intro({ onComplete }) {
-  // step: 1 (sage.mp4) | 2 (sceme2.mp4) | 'blackout'
+  // step: 1 (sage.mp4) | 2 (sceme2.mp4) | 3 (0924(1).mp4) | 'blackout'
   const [step, setStep] = useState(1);
   const [sub1Visible, setSub1Visible] = useState(false);
   const [scene2Sub, setScene2Sub] = useState("porte"); // 'porte' | 'adam'
@@ -36,13 +36,18 @@ export default function Mission1Intro({ onComplete }) {
     }
   }
 
-  // Handle Scene 2 end -> switch to blackout
+  // Handle Scene 2 end -> switch to Scene 3
   function handleScene2Ended() {
     setScene2Sub("adam");
-    // Show "Adam ?" briefly if not already seen, then switch to blackout
+    // Show "Adam ?" briefly if not already seen, then switch to scene 3
     scene2TimerRef.current = setTimeout(() => {
-      setStep("blackout");
+      setStep(3);
     }, 1200);
+  }
+  
+  // Handle Scene 3 end -> switch to blackout
+  function handleScene3Ended() {
+    setStep("blackout");
   }
 
   // Blackout sequence
@@ -72,10 +77,24 @@ export default function Mission1Intro({ onComplete }) {
     };
   }, []);
 
+  // Handle Skip Button
+  function handleSkip() {
+    if (step === 1) {
+      handleScene1Ended();
+    } else if (step === 2) {
+      if (scene2TimerRef.current) clearTimeout(scene2TimerRef.current);
+      setStep(3);
+    } else if (step === 3) {
+      setStep("blackout");
+    } else if (step === "blackout") {
+      onComplete();
+    }
+  }
+
   return (
     <div className="m1-intro-container">
       {/* Skip button always available */}
-      <button className="m1-intro-skip-btn" onClick={onComplete}>
+      <button className="m1-intro-skip-btn" onClick={handleSkip}>
         Passer
       </button>
 
@@ -121,6 +140,18 @@ export default function Mission1Intro({ onComplete }) {
             </span>
           </div>
         </>
+      )}
+
+      {/* SCENE 3 */}
+      {step === 3 && (
+        <video
+          ref={videoRef}
+          className="m1-intro-video"
+          src={require("../assets/scemes/0924(1).mp4")}
+          autoPlay
+          playsInline
+          onEnded={handleScene3Ended}
+        />
       )}
 
       {/* BLACKOUT & OMINOUS TEXT */}
