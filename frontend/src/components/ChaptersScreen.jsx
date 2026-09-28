@@ -14,7 +14,7 @@ const MISSIONS = [
     number: "MISSION 02",
     name: "Le rendez-vous",
     chapter: "Chapitre 1",
-    requiresCompleted: "mission1",
+    requiresCompleted: null, // toujours disponible
   },
   {
     id: "mission3",

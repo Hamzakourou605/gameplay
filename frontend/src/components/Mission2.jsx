@@ -450,7 +450,7 @@ function Journal({ clues, visible, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Mission2({ onComplete, addInventoryItem }) {
   const [intro, setIntro] = useState(true);
-  const [pos, setPos] = useState({ x: 900, y: 850 });
+  const [pos, setPos] = useState({ x: 700, y: 800 });
   const [dir, setDir] = useState("down");
   const [frame, setFrame] = useState(1);
   const [moving, setMoving] = useState(false);

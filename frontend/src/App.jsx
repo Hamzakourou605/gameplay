@@ -397,7 +397,10 @@ export default function App() {
     return (
       <ChaptersScreen 
         completedMissions={completedMissions} 
-        onSelectMission={(id) => setScreen(id === "mission1" ? "mission1_intro" : id)} 
+        onSelectMission={(id) => {
+          if (id === "mission1") setScreen("mission1_intro");
+          else setScreen(id);
+        }} 
         onBack={() => setScreen("menu")} 
       />
     );
