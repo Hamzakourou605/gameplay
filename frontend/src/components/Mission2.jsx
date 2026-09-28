@@ -622,7 +622,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
   if (intro) {
     return (
       <div className="mission2-container">
-        <div className="m2-intro-overlay" style={{ backgroundImage: `url(${require("../assets/backgroumd missiom2.png")})` }}>
+        <div className="m2-intro-overlay" style={{ backgroundImage: `url(${require("../assets/missiom2.png")})` }}>
           <div className="m2-intro-text">
             <div className="m2-intro-mission-tag">MISSION 2</div>
             <h2>Le rendez-vous</h2>
@@ -643,7 +643,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
         <div
           className="m2-world"
           style={{
-            backgroundImage: `url(${require("../assets/backgroumd missiom2.png")})`,
+            backgroundImage: `url(${require("../assets/missiom2.png")})`,
             width: WORLD_W,
             height: WORLD_H,
             transformOrigin: "0 0",
