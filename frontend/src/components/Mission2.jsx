@@ -5,11 +5,14 @@ import "./Mission2.css";
 // World & Player constants
 // ─────────────────────────────────────────────────────────────────────────────
 const SPEED = 4;
-const PLAYER_W = 90;   // taille comme les clients
-const PLAYER_H = 120;  // taille comme les clients
+const PLAYER_W = 90;
+const PLAYER_H = 120;
 const WORLD_W = 1600;
 const WORLD_H = 900;
 const INTERACT_DIST = 130;
+
+const FEET_W = 40;
+const FEET_H = 18;
 
 // Sprite config
 const SPRITES = {
@@ -24,16 +27,12 @@ const SPRITES = {
 // Le joueur ne peut se déplacer QUE dans ces rectangles.
 // Basé sur l'image missiom2.png (1600x900) — les couloirs rouges.
 const WALKABLE_ZONES = [
-  // Couloir principal bas (entre toutes les tables du bas)
-  { x: 270, y: 740, w: 840, h: 160 },
-  // Allée gauche (entre l'entrée et la table du Témoin)
-  { x: 270, y: 490, w: 120, h: 280 },
-  // Allée centrale (entre la table Témoin et la table Client 2)
-  { x: 380, y: 580, w: 260, h: 200 },
-  // Allée droite (entre la table Client 2 et Client 3)
-  { x: 840, y: 600, w: 130, h: 170 },
-  // Jonction centre-bas (devant Client 1)
-  { x: 450, y: 680, w: 160, h: 80 },
+  { x: 270, y: 740, w: 840, h: 160 }, // couloir principal bas
+  { x: 270, y: 490, w: 120, h: 280 }, // allée gauche (entrée → témoin)
+  { x: 380, y: 580, w: 260, h: 200 }, // allée centrale (témoin → client 2)
+  { x: 840, y: 600, w: 130, h: 170 }, // allée droite (client 2 → client 3)
+  { x: 450, y: 680, w: 160, h: 80 },  // jonction centre-bas (devant client 1)
+  { x: 100, y: 300, w: 140, h: 250 }, // zone d'entrée / porte
 ];
 
 // NPCs — positions in world space matching the café image characters (1600x900)
@@ -530,25 +529,33 @@ export default function Mission2({ onComplete, addInventoryItem }) {
         setMoving(true);
 
         setPos(prev => {
-          let nx = Math.max(PLAYER_W / 2, Math.min(WORLD_W - PLAYER_W / 2, prev.x + dx));
-          let ny = Math.max(PLAYER_H / 2, Math.min(WORLD_H - PLAYER_H / 2, prev.y + dy));
+          let nextX = prev.x;
+          let nextY = prev.y;
 
-          // Système whitelist : autoriser seulement les zones praticables
-          const inZone = (px, py) => WALKABLE_ZONES.some(z =>
-            px >= z.x && px <= z.x + z.w &&
-            py >= z.y && py <= z.y + z.h
-          );
+          // Système whitelist : les pieds du joueur doivent être dans la zone
+          const inZone = (px, py) => {
+            const feetX = px - FEET_W / 2;
+            const feetY = py - FEET_H; 
+            
+            const corners = [
+              [feetX, feetY],
+              [feetX + FEET_W, feetY],
+              [feetX, feetY + FEET_H],
+              [feetX + FEET_W, feetY + FEET_H],
+            ];
+            return corners.every(([cx, cy]) => WALKABLE_ZONES.some(z =>
+              cx >= z.x && cx <= z.x + z.w &&
+              cy >= z.y && cy <= z.y + z.h
+            ));
+          };
 
-          if (!inZone(nx, ny)) {
-            // Essayer axe X seul
-            if (inZone(nx, prev.y)) return { x: nx, y: prev.y };
-            // Essayer axe Y seul
-            if (inZone(prev.x, ny)) return { x: prev.x, y: ny };
-            // Bloquer
-            return prev;
-          }
+          if (dx !== 0 && inZone(prev.x + dx, prev.y)) nextX = prev.x + dx;
+          if (dy !== 0 && inZone(nextX, prev.y + dy)) nextY = prev.y + dy;
 
-          return { x: nx, y: ny };
+          nextX = Math.max(PLAYER_W / 2, Math.min(WORLD_W - PLAYER_W / 2, nextX));
+          nextY = Math.max(PLAYER_H / 2, Math.min(WORLD_H - PLAYER_H / 2, nextY));
+
+          return { x: nextX, y: nextY };
         });
       } else {
         if (moving) {
@@ -647,7 +654,14 @@ export default function Mission2({ onComplete, addInventoryItem }) {
             <div
               key={npc.id}
               className={`m2-npc ${npc.type}`}
-              style={{ left: npc.x, top: npc.y, background: npc.color, borderColor: npc.color === "transparent" ? "transparent" : "", boxShadow: npc.color === "transparent" ? "none" : "" }}
+              style={{ 
+                left: npc.x, 
+                top: npc.y, 
+                zIndex: Math.floor(npc.y),
+                background: npc.color, 
+                borderColor: npc.color === "transparent" ? "transparent" : "", 
+                boxShadow: npc.color === "transparent" ? "none" : "" 
+              }}
             >
               <span className="m2-npc-label" style={{ opacity: npc.color === "transparent" ? 0 : 1 }}>{npc.label}</span>
               {nearNpc === npc.id && !activeDialogue && (
@@ -657,7 +671,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
           ))}
 
           {/* Player */}
-          <div className="m2-player" style={{ left: pos.x, top: pos.y }}>
+          <div className="m2-player" style={{ left: pos.x, top: pos.y, zIndex: Math.floor(pos.y) }}>
             {spriteSrc
               ? <img
                   src={spriteSrc}
