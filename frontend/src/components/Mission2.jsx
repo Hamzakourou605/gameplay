@@ -7,9 +7,9 @@ import "./Mission2.css";
 const SPEED = 4;
 const PLAYER_W = 52;
 const PLAYER_H = 72;
-const WORLD_W = 2048;
-const WORLD_H = 1200;
-const INTERACT_DIST = 90;
+const WORLD_W = 1600;
+const WORLD_H = 900;
+const INTERACT_DIST = 100;
 
 // Sprite config: [dir] → { folder, prefix, frames }
 const SPRITES = {
@@ -20,63 +20,53 @@ const SPRITES = {
   back:  { folder: "back",  prefix: "back",   frames: 7 },
 };
 
-// Hitbox rectangles [x, y, w, h] for tables / furniture collisions in world coords
-// Mapped from the café image layout
+// Hitbox rectangles [x, y, w, h] for tables / furniture collisions in world coords (1600x900)
 const OBSTACLES = [
-  // Left single table (near window)
-  { x: 50,  y: 260, w: 200, h: 180 },
-  // Center-left table (client 1 area)
-  { x: 360, y: 510, w: 220, h: 160 },
-  // Center table (client 2 area)
-  { x: 740, y: 290, w: 220, h: 160 },
-  // Right table near wall (client 3 area)
-  { x: 1140, y: 540, w: 220, h: 160 },
-  // Far top-right table (empty)
-  { x: 1380, y: 110, w: 220, h: 160 },
-  // Counter / bar right side
-  { x: 1680, y: 80,  w: 360, h: 300 },
-  // Plants near door (left)
-  { x: 90,  y: 680, w: 90,  h: 90  },
-  // Plant right
-  { x: 1520, y: 700, w: 80, h: 80  },
-  // Entrance door area (no wall)
-  // Coat-rack
-  { x: 240, y: 680, w: 60, h: 80  },
+  // Window table (Témoin)
+  { x: 140,  y: 420, w: 140, h: 100 },
+  // Bottom-left table (Client 1)
+  { x: 420, y: 650, w: 150, h: 120 },
+  // Center table (Client 2)
+  { x: 670, y: 480, w: 180, h: 120 },
+  // Bottom-right table (Client 3)
+  { x: 970, y: 670, w: 140, h: 100 },
+  // Counter / Bar
+  { x: 1080, y: 380, w: 450, h: 180 },
 ];
 
-// NPCs — positions in world space matching the café image
+// NPCs — positions in world space matching the café image characters (1600x900)
 const NPCS = [
   {
+    id: "temoin",
+    label: "Témoin",
+    x: 280,
+    y: 480,
+    color: "transparent",
+    type: "witness",
+  },
+  {
     id: "client1",
-    label: "Client",
-    x: 420,
-    y: 430,
-    color: "#5a6e3b",
+    label: "Client 1",
+    x: 500,
+    y: 720,
+    color: "transparent",
     type: "client",
   },
   {
     id: "client2",
-    label: "Client",
-    x: 820,
-    y: 210,
-    color: "#5a6e3b",
+    label: "Client 2",
+    x: 750,
+    y: 550,
+    color: "transparent",
     type: "client",
   },
   {
     id: "client3",
-    label: "Client",
-    x: 1200,
-    y: 450,
-    color: "#5a6e3b",
+    label: "Client 3",
+    x: 1050,
+    y: 720,
+    color: "transparent",
     type: "client",
-  },
-  {
-    id: "temoin",
-    label: "Témoin",
-    x: 120,
-    y: 340,
-    color: "#7b4da0",
-    type: "witness",
   },
 ];
 
@@ -610,9 +600,13 @@ export default function Mission2({ onComplete, addInventoryItem }) {
     }
   }
 
-  // Camera
-  let camX = Math.max(0, Math.min(WORLD_W - viewport.w, pos.x - viewport.w / 2));
-  let camY = Math.max(0, Math.min(WORLD_H - viewport.h, pos.y - viewport.h / 2));
+  // Camera / Scaling
+  const scaleX = viewport.w / WORLD_W;
+  const scaleY = viewport.h / WORLD_H;
+  const scale = Math.max(scaleX, scaleY);
+  
+  const offsetX = (viewport.w - WORLD_W * scale) / 2;
+  const offsetY = (viewport.h - WORLD_H * scale) / 2;
 
   // Sprite
   const sp = SPRITES[dir] || SPRITES.down;
@@ -652,7 +646,8 @@ export default function Mission2({ onComplete, addInventoryItem }) {
             backgroundImage: `url(${require("../assets/backgroumd missiom2.png")})`,
             width: WORLD_W,
             height: WORLD_H,
-            transform: `translate(${-camX}px, ${-camY}px)`,
+            transformOrigin: "0 0",
+            transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
           }}
         >
           {/* NPCs */}
@@ -660,9 +655,9 @@ export default function Mission2({ onComplete, addInventoryItem }) {
             <div
               key={npc.id}
               className={`m2-npc ${npc.type}`}
-              style={{ left: npc.x, top: npc.y, background: npc.color }}
+              style={{ left: npc.x, top: npc.y, background: npc.color, borderColor: npc.color === "transparent" ? "transparent" : "", boxShadow: npc.color === "transparent" ? "none" : "" }}
             >
-              <span className="m2-npc-label">{npc.label}</span>
+              <span className="m2-npc-label" style={{ opacity: npc.color === "transparent" ? 0 : 1 }}>{npc.label}</span>
               {nearNpc === npc.id && !activeDialogue && (
                 <div className="m2-interact-prompt">[E] Interagir</div>
               )}
