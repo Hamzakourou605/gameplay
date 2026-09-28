@@ -4,24 +4,8 @@ import "./Mission2.css";
 // ─────────────────────────────────────────────────────────────────────────────
 // World & Player constants
 // ─────────────────────────────────────────────────────────────────────────────
-const SPEED = 4;
-const PLAYER_W = 120;
-const PLAYER_H = 160;
 const WORLD_W = 1600;
 const WORLD_H = 900;
-const INTERACT_DIST = 130;
-
-const FEET_W = 40;
-const FEET_H = 20;
-
-// Sprite config
-const SPRITES = {
-  down:  { folder: "face",  prefix: "face ",  frames: 6 },
-  up:    { folder: "up",    prefix: "up ",    frames: 6 },
-  left:  { folder: "left",  prefix: "gauche ", frames: 4 },
-  right: { folder: "right", prefix: "droite ", frames: 6 },
-  back:  { folder: "back",  prefix: "back",   frames: 7 },
-};
 
 // ─── ZONES PRATICABLES (whitelist) ────────────────────────────────────────────
 // Le joueur ne peut se déplacer QUE dans ces rectangles.
@@ -448,12 +432,7 @@ function Journal({ clues, visible, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Mission2({ onComplete, addInventoryItem }) {
   const [intro, setIntro] = useState(true);
-  const [pos, setPos] = useState({ x: 700, y: 800 });
-  const [dir, setDir] = useState("down");
-  const [frame, setFrame] = useState(1);
-  const [moving, setMoving] = useState(false);
-
-  const [nearNpc, setNearNpc] = useState(null);
+  const [hoveredNpc, setHoveredNpc] = useState(null);
   const [activeDialogue, setActiveDialogue] = useState(null);
   const [clues, setClues] = useState(new Set());
   const [notification, setNotification] = useState(null);
@@ -464,10 +443,6 @@ export default function Mission2({ onComplete, addInventoryItem }) {
   const [showComplete, setShowComplete] = useState(false);
 
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
-
-  const keys = useRef({});
-  const animTick = useRef(0);
-  const frameRef = useRef(1);
   const notifTimer = useRef(null);
 
   useEffect(() => {
@@ -490,140 +465,20 @@ export default function Mission2({ onComplete, addInventoryItem }) {
     notifTimer.current = setTimeout(() => setNotification(null), 4500);
   }
 
-  // Keyboard listeners for movement + interaction
+  // Keyboard listeners for journal
   useEffect(() => {
     if (intro || activeDialogue || showUsb || showComplete) return;
 
     function onKeyDown(e) {
-      keys.current[e.key] = true;
-
-      // Interact with E or Enter
-      if ((e.key === "e" || e.key === "E" || e.key === "Enter") && nearNpc) {
-        e.preventDefault();
-        setActiveDialogue(nearNpc);
-      }
-      // Journal with J
       if (e.key === "j" || e.key === "J") {
         setShowJournal(v => !v);
       }
     }
-    function onKeyUp(e) {
-      keys.current[e.key] = false;
-    }
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
     };
-  }, [intro, activeDialogue, nearNpc, showUsb, showComplete]);
-
-  // Movement loop
-  useEffect(() => {
-    if (intro || activeDialogue || showUsb || showComplete) return;
-
-    let rafId;
-    function loop() {
-      const k = keys.current;
-      let dx = 0, dy = 0, newDir = null;
-
-      if (k["ArrowLeft"] || k["a"] || k["q"]) { dx -= SPEED; newDir = "left"; }
-      else if (k["ArrowRight"] || k["d"]) { dx += SPEED; newDir = "right"; }
-      if (k["ArrowUp"] || k["w"] || k["z"]) { dy -= SPEED; newDir = newDir || "up"; }
-      else if (k["ArrowDown"] || k["s"]) { dy += SPEED; newDir = newDir || "down"; }
-
-      const isMoving = dx !== 0 || dy !== 0;
-
-      if (isMoving) {
-        animTick.current++;
-        if (animTick.current > 7) {
-          const sp = SPRITES[newDir] || SPRITES.down;
-          frameRef.current = (frameRef.current % sp.frames) + 1;
-          setFrame(frameRef.current);
-          setDir(newDir);
-          animTick.current = 0;
-        }
-        setMoving(true);
-
-        setPos(prev => {
-          let nextX = prev.x;
-          let nextY = prev.y;
-
-          // Système whitelist : les pieds du joueur doivent être dans la zone ET hors des objets bloquants
-          const inZone = (px, py) => {
-            const feetX = px - FEET_W / 2;
-            const feetY = py - FEET_H; 
-            
-            const corners = [
-              [feetX, feetY],
-              [feetX + FEET_W, feetY],
-              [feetX, feetY + FEET_H],
-              [feetX + FEET_W, feetY + FEET_H],
-            ];
-
-            // 1. Check if all corners are in at least one walkable zone
-            const insideWalkable = corners.every(([cx, cy]) => WALKABLE_ZONES.some(z =>
-              cx >= z.x && cx <= z.x + z.w &&
-              cy >= z.y && cy <= z.y + z.h
-            ));
-            if (!insideWalkable) return false;
-
-            // 2. Check if feet overlap with any collision object (blacklist)
-            // A rect overlaps another if: ax < bx+bw && ax+aw > bx-bw/2 ... wait, user used center-based collision.
-            // Let's use standard top-left AABB since COLLISION_OBJECTS is x,y (center) with w,h
-            // Converting COLLISION_OBJECTS x,y from center to top-left for standard AABB:
-            const hitsObject = COLLISION_OBJECTS.some(obj => {
-              const objLeft = obj.x - obj.w / 2;
-              const objRight = obj.x + obj.w / 2;
-              const objTop = obj.y - obj.h / 2;
-              const objBottom = obj.y + obj.h / 2;
-
-              return (
-                feetX < objRight &&
-                feetX + FEET_W > objLeft &&
-                feetY < objBottom &&
-                feetY + FEET_H > objTop
-              );
-            });
-
-            return !hitsObject;
-          };
-
-          if (dx !== 0 && inZone(prev.x + dx, prev.y)) nextX = prev.x + dx;
-          if (dy !== 0 && inZone(nextX, prev.y + dy)) nextY = prev.y + dy;
-
-          nextX = Math.max(PLAYER_W / 2, Math.min(WORLD_W - PLAYER_W / 2, nextX));
-          nextY = Math.max(PLAYER_H / 2, Math.min(WORLD_H - PLAYER_H / 2, nextY));
-
-          return { x: nextX, y: nextY };
-        });
-      } else {
-        if (moving) {
-          setMoving(false);
-          frameRef.current = 1;
-          setFrame(1);
-        }
-      }
-
-      rafId = requestAnimationFrame(loop);
-    }
-    rafId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafId);
-  }, [intro, activeDialogue, moving, showUsb, showComplete]);
-
-  // Check NPC proximity
-  useEffect(() => {
-    if (activeDialogue) return;
-    let closest = null;
-    let minDist = INTERACT_DIST;
-    for (const npc of NPCS) {
-      const dx = pos.x - npc.x;
-      const dy = pos.y - npc.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < minDist) { minDist = dist; closest = npc.id; }
-    }
-    setNearNpc(closest);
-  }, [pos, activeDialogue]);
+  }, [intro, activeDialogue, showUsb, showComplete]);
 
   function handleDialogueComplete() {
     const npc = activeDialogue;
@@ -647,10 +502,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
   const offsetX = (viewport.w - WORLD_W * scale) / 2;
   const offsetY = (viewport.h - WORLD_H * scale) / 2;
 
-  // Sprite
-  const sp = SPRITES[dir] || SPRITES.down;
-  let spriteSrc = null;
-  try { spriteSrc = require(`../assets/${sp.folder}/${sp.prefix}${frame}.png`); } catch (e) {}
+
 
   // Objective text
   const objective = clues.has("temoin_fenetre")
@@ -661,7 +513,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
   if (intro) {
     return (
       <div className="mission2-container">
-        <div className="m2-intro-overlay" style={{ backgroundImage: `url(${require("../assets/missiom2.png")})` }}>
+        <div className="m2-intro-overlay" style={{ backgroundImage: `url(${require("../assets/missiom 2 backgroumd .png")})` }}>
           <div className="m2-intro-text">
             <div className="m2-intro-mission-tag">MISSION 2</div>
             <h2>Le rendez-vous</h2>
@@ -682,7 +534,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
         <div
           className="m2-world"
           style={{
-            backgroundImage: `url(${require("../assets/missiom2.png")})`,
+            backgroundImage: `url(${require("../assets/missiom 2 backgroumd .png")})`,
             width: WORLD_W,
             height: WORLD_H,
             transformOrigin: "0 0",
@@ -702,27 +554,16 @@ export default function Mission2({ onComplete, addInventoryItem }) {
                 borderColor: npc.color === "transparent" ? "transparent" : "", 
                 boxShadow: npc.color === "transparent" ? "none" : "" 
               }}
+              onMouseEnter={() => setHoveredNpc(npc.id)}
+              onMouseLeave={() => setHoveredNpc(null)}
+              onClick={() => setActiveDialogue(npc.id)}
             >
               <span className="m2-npc-label" style={{ opacity: npc.color === "transparent" ? 0 : 1 }}>{npc.label}</span>
-              {nearNpc === npc.id && !activeDialogue && (
-                <div className="m2-interact-prompt">[E] Interagir</div>
+              {hoveredNpc === npc.id && !activeDialogue && (
+                <div className="m2-interact-prompt">Clic pour interagir</div>
               )}
             </div>
           ))}
-
-          {/* Player */}
-          <div className="m2-player" style={{ left: pos.x, top: pos.y, zIndex: Math.floor(pos.y) }}>
-            {spriteSrc
-              ? <img
-                  src={spriteSrc}
-                  alt="Yanis"
-                  className="m2-player-sprite"
-                  style={{ transform: dir === "right" ? "none" : dir === "left" ? "none" : "none" }}
-                />
-              : <div className="m2-player-fallback">Y</div>
-            }
-            <div className="m2-player-label">Yanis</div>
-          </div>
         </div>
 
         {/* HUD */}
@@ -738,7 +579,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
 
         {/* Controls hint */}
         <div className="m2-controls-hint">
-          Flèches / ZQSD pour se déplacer · [E] Interagir · [J] Journal
+          Clic pour interagir avec un personnage · [J] Journal
         </div>
       </div>
 
