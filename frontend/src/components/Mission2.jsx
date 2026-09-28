@@ -5,13 +5,13 @@ import "./Mission2.css";
 // World & Player constants
 // ─────────────────────────────────────────────────────────────────────────────
 const SPEED = 4;
-const PLAYER_W = 72;  // agrandi
-const PLAYER_H = 96;  // agrandi
+const PLAYER_W = 90;   // taille comme les clients
+const PLAYER_H = 120;  // taille comme les clients
 const WORLD_W = 1600;
 const WORLD_H = 900;
-const INTERACT_DIST = 110;
+const INTERACT_DIST = 130;
 
-// Sprite config: [dir] → { folder, prefix, frames }
+// Sprite config
 const SPRITES = {
   down:  { folder: "face",  prefix: "face ",  frames: 6 },
   up:    { folder: "up",    prefix: "up ",    frames: 6 },
@@ -20,42 +20,20 @@ const SPRITES = {
   back:  { folder: "back",  prefix: "back",   frames: 7 },
 };
 
-// ─── OBSTACLES (zones de collision forcées) ────────────────────────────────
-// Coordonnées basées sur missiom2.png (1600x900)
-// Chaque zone { x, y, w, h } est le hitbox d'un meuble/mur.
-const OBSTACLES = [
-  // ── Mur du fond (haut)
-  { x: 0,    y: 0,   w: 1600, h: 90  },
-  // ── Mur gauche
-  { x: 0,    y: 0,   w: 60,   h: 900 },
-  // ── Mur droit
-  { x: 1540, y: 0,   w: 60,   h: 900 },
-  // ── Table Témoin (fenêtre gauche, mi-hauteur)
-  { x: 95,   y: 385, w: 180,  h: 115 },
-  // ── Chaises table Témoin
-  { x: 65,   y: 450, w: 40,   h: 60  },
-  // ── Grande fenêtre / porte entrée (bloquer le bas des vitres)
-  { x: 270,  y: 90,  w: 320,  h: 80  },
-  // ── Plante gauche entrée
-  { x: 260,  y: 600, w: 80,   h: 80  },
-  // ── Porte manteau
-  { x: 370,  y: 580, w: 50,   h: 100 },
-  // ── Table Client 1 (bas gauche)
-  { x: 375,  y: 635, w: 200,  h: 130 },
-  // ── Table centrale Client 2 + Client 2b
-  { x: 620,  y: 455, w: 230,  h: 145 },
-  // ── Table haute vide (centre-haut)
-  { x: 700,  y: 175, w: 190,  h: 120 },
-  // ── Table vide haute droite
-  { x: 930,  y: 100, w: 190,  h: 120 },
-  // ── Table Client 3 (bas droite)
-  { x: 930,  y: 640, w: 195,  h: 135 },
-  // ── Comptoir / Bar (grand, droite)
-  { x: 1050, y: 300, w: 490,  h: 230 },
-  // ── Vitrine pâtisseries
-  { x: 1050, y: 230, w: 220,  h: 80  },
-  // ── Étagères droite
-  { x: 1380, y: 90,  w: 180,  h: 180 },
+// ─── ZONES PRATICABLES (whitelist) ────────────────────────────────────────────
+// Le joueur ne peut se déplacer QUE dans ces rectangles.
+// Basé sur l'image missiom2.png (1600x900) — les couloirs rouges.
+const WALKABLE_ZONES = [
+  // Couloir principal bas (entre toutes les tables du bas)
+  { x: 270, y: 740, w: 840, h: 160 },
+  // Allée gauche (entre l'entrée et la table du Témoin)
+  { x: 270, y: 490, w: 120, h: 280 },
+  // Allée centrale (entre la table Témoin et la table Client 2)
+  { x: 380, y: 580, w: 260, h: 200 },
+  // Allée droite (entre la table Client 2 et Client 3)
+  { x: 840, y: 600, w: 130, h: 170 },
+  // Jonction centre-bas (devant Client 1)
+  { x: 450, y: 680, w: 160, h: 80 },
 ];
 
 // NPCs — positions in world space matching the café image characters (1600x900)
@@ -575,10 +553,20 @@ export default function Mission2({ onComplete, addInventoryItem }) {
           let nx = Math.max(PLAYER_W / 2, Math.min(WORLD_W - PLAYER_W / 2, prev.x + dx));
           let ny = Math.max(PLAYER_H / 2, Math.min(WORLD_H - PLAYER_H / 2, prev.y + dy));
 
-          // Separate axis collision
-          if (collidesWithObstacles(nx, prev.y)) nx = prev.x;
-          if (collidesWithObstacles(prev.x, ny)) ny = prev.y;
-          if (collidesWithObstacles(nx, ny)) { nx = prev.x; ny = prev.y; }
+          // Système whitelist : autoriser seulement les zones praticables
+          const inZone = (px, py) => WALKABLE_ZONES.some(z =>
+            px >= z.x && px <= z.x + z.w &&
+            py >= z.y && py <= z.y + z.h
+          );
+
+          if (!inZone(nx, ny)) {
+            // Essayer axe X seul
+            if (inZone(nx, prev.y)) return { x: nx, y: prev.y };
+            // Essayer axe Y seul
+            if (inZone(prev.x, ny)) return { x: prev.x, y: ny };
+            // Bloquer
+            return prev;
+          }
 
           return { x: nx, y: ny };
         });
