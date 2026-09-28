@@ -5,11 +5,11 @@ import "./Mission2.css";
 // World & Player constants
 // ─────────────────────────────────────────────────────────────────────────────
 const SPEED = 4;
-const PLAYER_W = 52;
-const PLAYER_H = 72;
+const PLAYER_W = 72;  // agrandi
+const PLAYER_H = 96;  // agrandi
 const WORLD_W = 1600;
 const WORLD_H = 900;
-const INTERACT_DIST = 100;
+const INTERACT_DIST = 110;
 
 // Sprite config: [dir] → { folder, prefix, frames }
 const SPRITES = {
@@ -20,18 +20,42 @@ const SPRITES = {
   back:  { folder: "back",  prefix: "back",   frames: 7 },
 };
 
-// Hitbox rectangles [x, y, w, h] for tables / furniture collisions in world coords (1600x900)
+// ─── OBSTACLES (zones de collision forcées) ────────────────────────────────
+// Coordonnées basées sur missiom2.png (1600x900)
+// Chaque zone { x, y, w, h } est le hitbox d'un meuble/mur.
 const OBSTACLES = [
-  // Window table (Témoin)
-  { x: 140,  y: 420, w: 140, h: 100 },
-  // Bottom-left table (Client 1)
-  { x: 420, y: 650, w: 150, h: 120 },
-  // Center table (Client 2)
-  { x: 670, y: 480, w: 180, h: 120 },
-  // Bottom-right table (Client 3)
-  { x: 970, y: 670, w: 140, h: 100 },
-  // Counter / Bar
-  { x: 1080, y: 380, w: 450, h: 180 },
+  // ── Mur du fond (haut)
+  { x: 0,    y: 0,   w: 1600, h: 90  },
+  // ── Mur gauche
+  { x: 0,    y: 0,   w: 60,   h: 900 },
+  // ── Mur droit
+  { x: 1540, y: 0,   w: 60,   h: 900 },
+  // ── Table Témoin (fenêtre gauche, mi-hauteur)
+  { x: 95,   y: 385, w: 180,  h: 115 },
+  // ── Chaises table Témoin
+  { x: 65,   y: 450, w: 40,   h: 60  },
+  // ── Grande fenêtre / porte entrée (bloquer le bas des vitres)
+  { x: 270,  y: 90,  w: 320,  h: 80  },
+  // ── Plante gauche entrée
+  { x: 260,  y: 600, w: 80,   h: 80  },
+  // ── Porte manteau
+  { x: 370,  y: 580, w: 50,   h: 100 },
+  // ── Table Client 1 (bas gauche)
+  { x: 375,  y: 635, w: 200,  h: 130 },
+  // ── Table centrale Client 2 + Client 2b
+  { x: 620,  y: 455, w: 230,  h: 145 },
+  // ── Table haute vide (centre-haut)
+  { x: 700,  y: 175, w: 190,  h: 120 },
+  // ── Table vide haute droite
+  { x: 930,  y: 100, w: 190,  h: 120 },
+  // ── Table Client 3 (bas droite)
+  { x: 930,  y: 640, w: 195,  h: 135 },
+  // ── Comptoir / Bar (grand, droite)
+  { x: 1050, y: 300, w: 490,  h: 230 },
+  // ── Vitrine pâtisseries
+  { x: 1050, y: 230, w: 220,  h: 80  },
+  // ── Étagères droite
+  { x: 1380, y: 90,  w: 180,  h: 180 },
 ];
 
 // NPCs — positions in world space matching the café image characters (1600x900)
