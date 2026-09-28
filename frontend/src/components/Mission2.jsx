@@ -1,301 +1,714 @@
-import React, { useState, useEffect, useRef } from "react";
-import DialogueBox from "./DialogueBox";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Mission2.css";
 
-const SPEED = 5;
-const PLAYER_SIZE = 40;
-const WORLD_WIDTH = 2500;
-const WORLD_HEIGHT = 1445;
+// ─────────────────────────────────────────────────────────────────────────────
+// World & Player constants
+// ─────────────────────────────────────────────────────────────────────────────
+const SPEED = 4;
+const PLAYER_W = 52;
+const PLAYER_H = 72;
+const WORLD_W = 2048;
+const WORLD_H = 1200;
+const INTERACT_DIST = 90;
 
-// Distances
-const INTERACT_DIST = 100;
-
-// NPCs
-const NPCS = [
-  { id: "client1", x: 600, y: 700, type: "client" },
-  { id: "client2", x: 1400, y: 450, type: "client" },
-  { id: "client3", x: 1900, y: 1000, type: "client" },
-  { id: "temoin", x: 300, y: 250, type: "witness" },
-];
-
-const DIALOGUES = {
-  client1: [
-    { speaker: "Yanis", text: "Excusez-moi... Vous connaissez Adam ?" },
-    { speaker: "Client", text: "Adam ?" },
-    { speaker: "Client", text: "Non, désolé. Je n'ai rien vu." }
-  ],
-  client2: [
-    { speaker: "Yanis", text: "Excusez-moi, je cherche quelqu'un qui s'appelle Adam. Vous l'avez déjà vu ici ?" },
-    { speaker: "Client", text: "Adam ?" },
-    { speaker: "Client", text: "Oui... je crois que je l'ai vu hier." },
-    { speaker: "Yanis", text: "Vous êtes sûr ?" },
-    { speaker: "Client", text: "Oui. Il était assis près de cette table." },
-    { speaker: "Client", text: "Mais il avait l'air très inquiet." },
-    { speaker: "Yanis", text: "Vous savez où il est parti ?" },
-    { speaker: "Client", text: "Non. Je ne sais pas." }
-  ],
-  client3: [
-    { speaker: "Yanis", text: "Excusez-moi... Vous connaissez Adam ?" },
-    { speaker: "Client", text: "Non." },
-    { speaker: "Yanis", text: "Vous ne l'avez jamais vu ?" },
-    { speaker: "Client", text: "Je ne connais aucun Adam." }
-  ],
-  temoin: [
-    { speaker: "Yanis", text: "Excusez-moi... Je cherche Adam." },
-    { speaker: "Témoin", text: "Adam..." },
-    { speaker: "Témoin", text: "Oui. Je l'ai vu hier soir." },
-    { speaker: "Yanis", text: "Vous êtes sûr ?" },
-    { speaker: "Témoin", text: "Oui. Il était très inquiet. Il regardait constamment autour de lui." },
-    { speaker: "Yanis", text: "Vous avez parlé avec lui ?" },
-    { speaker: "Témoin", text: "Oui. Il m'a demandé de garder quelque chose pour lui." },
-    { speaker: "Témoin", text: "Mais je ne savais pas pourquoi." },
-    { speaker: "Yanis", text: "Qu'est-ce qu'il vous a laissé ?" },
-    { speaker: "Témoin", text: "Une clé USB." },
-    { speaker: "Témoin", text: "Adam m'a demandé de ne faire confiance à personne." },
-    { speaker: "Témoin", text: "Il m'a aussi dit que quelqu'un le suivait." },
-    { speaker: "Yanis", text: "Quelqu'un le suivait ? Qui ?" },
-    { speaker: "Témoin", text: "Je ne sais pas." },
-    { speaker: "Témoin", text: "C'est tout ce que je peux vous dire." }
-  ]
+// Sprite config: [dir] → { folder, prefix, frames }
+const SPRITES = {
+  down:  { folder: "face",  prefix: "face ",  frames: 6 },
+  up:    { folder: "up",    prefix: "up ",    frames: 6 },
+  left:  { folder: "left",  prefix: "gauche ", frames: 4 },
+  right: { folder: "right", prefix: "droite ", frames: 6 },
+  back:  { folder: "back",  prefix: "back",   frames: 7 },
 };
 
-export default function Mission2({ onComplete, addInventoryItem }) {
-  const [intro, setIntro] = useState(true);
-  
-  // Player state
-  const [pos, setPos] = useState({ x: 700, y: 700 });
-  
-  // Interaction state
-  const [nearNpc, setNearNpc] = useState(null);
-  const [activeDialogue, setActiveDialogue] = useState(null);
-  
-  // Progress state
-  const [hasUsb, setHasUsb] = useState(false);
-  const [notification, setNotification] = useState(null);
+// Hitbox rectangles [x, y, w, h] for tables / furniture collisions in world coords
+// Mapped from the café image layout
+const OBSTACLES = [
+  // Left single table (near window)
+  { x: 50,  y: 260, w: 200, h: 180 },
+  // Center-left table (client 1 area)
+  { x: 360, y: 510, w: 220, h: 160 },
+  // Center table (client 2 area)
+  { x: 740, y: 290, w: 220, h: 160 },
+  // Right table near wall (client 3 area)
+  { x: 1140, y: 540, w: 220, h: 160 },
+  // Far top-right table (empty)
+  { x: 1380, y: 110, w: 220, h: 160 },
+  // Counter / bar right side
+  { x: 1680, y: 80,  w: 360, h: 300 },
+  // Plants near door (left)
+  { x: 90,  y: 680, w: 90,  h: 90  },
+  // Plant right
+  { x: 1520, y: 700, w: 80, h: 80  },
+  // Entrance door area (no wall)
+  // Coat-rack
+  { x: 240, y: 680, w: 60, h: 80  },
+];
 
-  // Viewport state for camera
-  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+// NPCs — positions in world space matching the café image
+const NPCS = [
+  {
+    id: "client1",
+    label: "Client",
+    x: 420,
+    y: 430,
+    color: "#5a6e3b",
+    type: "client",
+  },
+  {
+    id: "client2",
+    label: "Client",
+    x: 820,
+    y: 210,
+    color: "#5a6e3b",
+    type: "client",
+  },
+  {
+    id: "client3",
+    label: "Client",
+    x: 1200,
+    y: 450,
+    color: "#5a6e3b",
+    type: "client",
+  },
+  {
+    id: "temoin",
+    label: "Témoin",
+    x: 120,
+    y: 340,
+    color: "#7b4da0",
+    type: "witness",
+  },
+];
 
-  useEffect(() => {
-    const handleResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+// ─────────────────────────────────────────────────────────────────────────────
+// Dialogue trees
+// ─────────────────────────────────────────────────────────────────────────────
+const DIALOGUES = {
+  client1: {
+    type: "linear_with_choice",
+    lines: [
+      { speaker: "Yanis", text: "Excusez-moi... vous étiez ici hier soir ?" },
+      { speaker: "Client 1", text: "Oui. Je viens assez souvent." },
+      { speaker: "Yanis", text: "Vous étiez là vers 21h30 ?" },
+      { speaker: "Client 1", text: "Oui, je crois. Pourquoi ?" },
+      { speaker: "Yanis", text: "Vous avez vu cet homme ?" },
+      { speaker: "Client 1", text: "Adam ? Non... désolé. Je ne faisais pas vraiment attention aux autres clients." },
+    ],
+    choices: [
+      {
+        label: "Vous étiez assis où ?",
+        response: [
+          { speaker: "Client 1", text: "Près du comptoir. Je regardais mon téléphone." },
+        ],
+        clue: null,
+      },
+      {
+        label: "Vous avez remarqué quelque chose d'inhabituel ?",
+        response: [
+          { speaker: "Client 1", text: "Maintenant que vous le dites... j'ai entendu quelqu'un parler assez fort près de la fenêtre." },
+          { speaker: "Yanis", text: "Vous avez vu qui c'était ?" },
+          { speaker: "Client 1", text: "Non. Je n'ai pas regardé." },
+        ],
+        clue: "fenetre",
+      },
+      {
+        label: "D'accord, merci.",
+        response: [],
+        clue: null,
+      },
+    ],
+  },
 
-  // Input state
-  const keys = useRef({ w: false, a: false, s: false, d: false, z: false, q: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false });
+  client2: {
+    type: "linear_with_choice",
+    lines: [
+      { speaker: "Yanis", text: "Excusez-moi. Vous étiez ici hier soir ?" },
+      { speaker: "Client 2", text: "Oui." },
+      { speaker: "Yanis", text: "Vous connaissez Adam ?" },
+      { speaker: "Client 2", text: "Adam ?... Oui." },
+      { speaker: "Yanis", text: "Vous lui avez parlé ?" },
+      { speaker: "Client 2", text: "Peut-être." },
+      { speaker: "Yanis", text: "Peut-être ?" },
+      { speaker: "Client 2", text: "Je ne me souviens pas exactement." },
+      { speaker: "Yanis", text: "Vous venez pourtant de dire que vous le connaissiez." },
+      { speaker: "Client 2", text: "Écoutez... je ne vois pas pourquoi vous me posez toutes ces questions." },
+    ],
+    choices: [
+      {
+        label: "Vous l'avez rencontré hier. Pourquoi mentir ?",
+        response: [
+          { speaker: "Client 2", text: "..." },
+        ],
+        clue: null,
+      },
+      {
+        label: "Vous savez où il était assis ?",
+        response: [
+          { speaker: "Client 2", text: "À la table 7, je crois." },
+          { speaker: "Yanis", text: "Vous en êtes sûr ?" },
+          { speaker: "Client 2", text: "...Oui." },
+          { speaker: "Client 2", text: "*Il jette un regard rapide vers l'autre client.*" },
+        ],
+        clue: "table7",
+      },
+      {
+        label: "Très bien. Je vais vous laisser.",
+        response: [],
+        clue: null,
+      },
+    ],
+  },
 
-  // Handle keyboard events for movement
-  useEffect(() => {
-    if (intro || activeDialogue || hasUsb) return;
+  client3: {
+    type: "conditional",
+    lines: [
+      { speaker: "Yanis", text: "Bonsoir. Vous étiez ici hier soir ?" },
+      { speaker: "Client 3", text: "Oui." },
+      { speaker: "Yanis", text: "Vous connaissez Adam ?" },
+      { speaker: "Client 3", text: "Adam ?" },
+      { speaker: "Client 3", text: "Non. Je ne connais aucun Adam." },
+    ],
+    linesWithTicket: [
+      { speaker: "Yanis", text: "Bonsoir. Vous étiez ici hier soir ?" },
+      { speaker: "Client 3", text: "Oui." },
+      { speaker: "Yanis", text: "Vous dites ne pas connaître Adam..." },
+      { speaker: "Yanis", text: "...Alors pourquoi votre sac était posé sur la table 7 hier soir ?" },
+      { speaker: "Client 3", text: "*regarde le ticket... puis la fenêtre... devient nerveux.*" },
+      { speaker: "Client 3", text: "Ce n'était pas mon sac." },
+      { speaker: "Yanis", text: "Je viens de vous dire que je l'ai vu." },
+      { speaker: "Client 3", text: "Écoutez... je ne veux pas avoir de problèmes." },
+      { speaker: "Yanis", text: "Alors dites-moi ce que vous savez." },
+      { speaker: "Client 3", text: "...Tu devrais parler à la personne près de la fenêtre." },
+      { speaker: "Yanis", text: "Qui ?" },
+      { speaker: "Client 3", text: "Elle était avec Adam hier soir." },
+    ],
+    clue: "temoin_fenetre",
+  },
 
-    function handleKeyDown(e) {
-      if (keys.current.hasOwnProperty(e.key)) keys.current[e.key] = true;
-      if (keys.current.hasOwnProperty(e.key.toLowerCase())) keys.current[e.key.toLowerCase()] = true;
-      
-      // Interact
-      if (e.key === "Enter" && nearNpc) {
-        setActiveDialogue(nearNpc);
+  temoin: {
+    type: "choice_start",
+    intro: [
+      { speaker: "Yanis", text: "Vous connaissez Adam ?" },
+      { speaker: "Témoin", text: "*Silence de quelques secondes*" },
+      { speaker: "Témoin", text: "Qui t'a envoyé ?" },
+    ],
+    choices: [
+      {
+        label: "Je suis son ami.",
+        response: [
+          { speaker: "Témoin", text: "Alors tu dois déjà savoir qu'Adam avait peur." },
+          { speaker: "Yanis", text: "Peur de quoi ?" },
+        ],
+      },
+      {
+        label: "Je cherche simplement la vérité.",
+        response: [
+          { speaker: "Témoin", text: "La vérité peut parfois être dangereuse." },
+          { speaker: "Yanis", text: "Je suis prêt à l'entendre." },
+        ],
+      },
+      {
+        label: "Lina m'a envoyé.",
+        response: [
+          { speaker: "Témoin", text: "*regarde Yanis attentivement*" },
+          { speaker: "Témoin", text: "Lina..." },
+          { speaker: "Témoin", text: "Alors elle t'a finalement envoyé me voir." },
+        ],
+      },
+    ],
+    ending: [
+      { speaker: "Témoin", text: "Adam était très inquiet hier soir." },
+      { speaker: "Yanis", text: "Pourquoi ?" },
+      { speaker: "Témoin", text: "Il pensait que quelqu'un le surveillait." },
+      { speaker: "Yanis", text: "Qui ?" },
+      { speaker: "Témoin", text: "*regarde autour de lui* Je ne sais pas." },
+      { speaker: "Témoin", text: "Mais Adam m'a demandé de garder quelque chose pour lui." },
+      { speaker: "Yanis", text: "Qu'est-ce que c'était ?" },
+      { speaker: "Témoin", text: "*sort lentement une clé USB de sa poche*" },
+      { speaker: "Témoin", text: "Prends-la. Tu en auras besoin." },
+    ],
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Collision helper
+// ─────────────────────────────────────────────────────────────────────────────
+function collidesWithObstacles(nx, ny) {
+  const hw = PLAYER_W / 2;
+  const hh = PLAYER_H / 2;
+  // Use a narrower hitbox for feet (bottom third of player)
+  const px1 = nx - hw * 0.5;
+  const px2 = nx + hw * 0.5;
+  const py1 = ny + hh * 0.3;
+  const py2 = ny + hh;
+
+  for (const o of OBSTACLES) {
+    if (px2 > o.x && px1 < o.x + o.w && py2 > o.y && py1 < o.y + o.h) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Advanced Dialogue Component with choices
+// ─────────────────────────────────────────────────────────────────────────────
+function AdvancedDialogue({ npcId, clues, onComplete, onAddClue }) {
+  const data = DIALOGUES[npcId];
+  // state machine: 'lines' | 'choices' | 'response' | 'ending' | 'done'
+  const [phase, setPhase] = useState("lines");
+  const [lineIdx, setLineIdx] = useState(0);
+  const [choiceIdx, setChoiceIdx] = useState(null);
+  const [responseIdx, setResponseIdx] = useState(0);
+
+  const getLines = () => {
+    if (npcId === "client3") {
+      return clues.has("table7") ? data.linesWithTicket : data.lines;
+    }
+    return data.lines || [];
+  };
+
+  const currentLines = phase === "lines" ? getLines()
+    : phase === "response" && choiceIdx !== null ? (data.choices?.[choiceIdx]?.response || [])
+    : phase === "ending" ? (data.ending || [])
+    : phase === "intro" ? (data.intro || [])
+    : [];
+
+  const currentLine = currentLines[lineIdx] || currentLines[0];
+
+  function advance() {
+    if (phase === "lines") {
+      if (lineIdx < currentLines.length - 1) {
+        setLineIdx(i => i + 1);
+      } else {
+        // Move to choices or done
+        if (data.type === "linear_with_choice" && data.choices) {
+          setPhase("choices");
+          setLineIdx(0);
+        } else if (data.type === "conditional") {
+          if (npcId === "client3" && clues.has("table7")) {
+            onAddClue("temoin_fenetre");
+          }
+          onComplete();
+        } else {
+          onComplete();
+        }
+      }
+    } else if (phase === "intro") {
+      if (lineIdx < currentLines.length - 1) {
+        setLineIdx(i => i + 1);
+      } else {
+        setPhase("choices");
+        setLineIdx(0);
+      }
+    } else if (phase === "response") {
+      if (lineIdx < currentLines.length - 1) {
+        setLineIdx(i => i + 1);
+      } else {
+        // After response, go to ending if temoin
+        if (data.ending) {
+          setPhase("ending");
+          setLineIdx(0);
+        } else {
+          onComplete();
+        }
+      }
+    } else if (phase === "ending") {
+      if (lineIdx < currentLines.length - 1) {
+        setLineIdx(i => i + 1);
+      } else {
+        onComplete();
       }
     }
-    function handleKeyUp(e) {
-      if (keys.current.hasOwnProperty(e.key)) keys.current[e.key] = false;
-      if (keys.current.hasOwnProperty(e.key.toLowerCase())) keys.current[e.key.toLowerCase()] = false;
+  }
+
+  function handleChoiceSelect(idx) {
+    setChoiceIdx(idx);
+    const choice = data.choices[idx];
+    if (choice.clue) onAddClue(choice.clue);
+
+    if (choice.response && choice.response.length > 0) {
+      setPhase("response");
+      setLineIdx(0);
+    } else if (data.ending) {
+      setPhase("ending");
+      setLineIdx(0);
+    } else {
+      onComplete();
     }
+  }
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, [intro, activeDialogue, nearNpc, hasUsb]);
+  // Init intro for temoin
+  useEffect(() => {
+    if (data.type === "choice_start") {
+      setPhase("intro");
+    }
+  }, [data.type]);
 
-  const [playerAnim, setPlayerAnim] = useState({ dir: "front", frame: 1, moving: false });
+  // Key handling
+  useEffect(() => {
+    if (phase === "choices") return;
+    function handleKey(e) {
+      if (e.key === "Enter" || e.key === " " || e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        advance();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  });
+
+  if (phase === "choices") {
+    return (
+      <div className="dialogue-box-container">
+        <div className="dialogue-box">
+          <div className="dialogue-speaker">Yanis</div>
+          <div className="dialogue-choices">
+            {data.choices.map((c, i) => (
+              <button key={i} className="dialogue-choice-btn" onClick={() => handleChoiceSelect(i)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentLine) return null;
+
+  return (
+    <div className="dialogue-box-container">
+      <div className="dialogue-box">
+        <div className="dialogue-speaker">{currentLine.speaker}</div>
+        <div className="dialogue-text">{currentLine.text}</div>
+        <div className="dialogue-hint">[Entrée] continuer...</div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USB Item Obtained Screen
+// ─────────────────────────────────────────────────────────────────────────────
+function UsbObtained({ onContinue }) {
+  return (
+    <div className="m2-usb-overlay">
+      <div className="m2-usb-card">
+        <div className="m2-usb-icon">💾</div>
+        <div className="m2-usb-title">OBJET OBTENU</div>
+        <div className="m2-usb-name">CLÉ USB</div>
+        <div className="m2-usb-desc">« Appartenait à Adam. »</div>
+        <button className="m2-usb-btn" onClick={onContinue}>Continuer</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mission Complete Screen
+// ─────────────────────────────────────────────────────────────────────────────
+function MissionComplete2({ onContinue }) {
+  return (
+    <div className="m2-complete-overlay">
+      <div className="m2-complete-card">
+        <div className="m2-complete-check">✓</div>
+        <div className="m2-complete-title">MISSION ACCOMPLIE</div>
+        <div className="m2-complete-sub">LE RENDEZ-VOUS</div>
+        <p>Vous avez retrouvé le témoin d'Adam.</p>
+        <div className="m2-complete-reward">Objet récupéré : 💾 CLÉ USB</div>
+        <div className="m2-complete-divider" />
+        <div className="m2-complete-next">NOUVELLE MISSION DÉBLOQUÉE</div>
+        <button className="m2-usb-btn" onClick={onContinue}>Continuer</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Journal Panel
+// ─────────────────────────────────────────────────────────────────────────────
+const CLUE_LABELS = {
+  fenetre:        "Une personne se trouvait près de la fenêtre",
+  table7:         "Adam était à la table 7",
+  client2_cache:  "Client 2 semble cacher quelque chose",
+  temoin_fenetre: "Le témoin est près de la fenêtre",
+};
+
+function Journal({ clues, visible, onClose }) {
+  if (!visible) return null;
+  return (
+    <div className="m2-journal-overlay" onClick={onClose}>
+      <div className="m2-journal" onClick={e => e.stopPropagation()}>
+        <div className="m2-journal-title">JOURNAL</div>
+        <ul>
+          <li>✓ Adam était au Café Nova</li>
+          <li>✓ Heure : 21h30</li>
+          {clues.has("table7") && <li>✓ Table : 7</li>}
+          {clues.has("fenetre") && <li>✓ Une personne était près de la fenêtre</li>}
+          {clues.has("client2_cache") && <li>✓ Client 2 semble cacher quelque chose</li>}
+          {clues.has("temoin_fenetre") && <li>✓ Le témoin connaît la personne près de la fenêtre</li>}
+        </ul>
+        <button className="m2-journal-close" onClick={onClose}>Fermer</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Mission 2 Component
+// ─────────────────────────────────────────────────────────────────────────────
+export default function Mission2({ onComplete, addInventoryItem }) {
+  const [intro, setIntro] = useState(true);
+  const [pos, setPos] = useState({ x: 900, y: 850 });
+  const [dir, setDir] = useState("down");
+  const [frame, setFrame] = useState(1);
+  const [moving, setMoving] = useState(false);
+
+  const [nearNpc, setNearNpc] = useState(null);
+  const [activeDialogue, setActiveDialogue] = useState(null);
+  const [clues, setClues] = useState(new Set());
+  const [notification, setNotification] = useState(null);
+  const [showJournal, setShowJournal] = useState(false);
+
+  // end states
+  const [showUsb, setShowUsb] = useState(false);
+  const [showComplete, setShowComplete] = useState(false);
+
+  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+
+  const keys = useRef({});
   const animTick = useRef(0);
+  const frameRef = useRef(1);
+  const notifTimer = useRef(null);
+
+  useEffect(() => {
+    const h = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+
+  function addClue(clueId) {
+    setClues(prev => {
+      const next = new Set(prev);
+      next.add(clueId);
+      return next;
+    });
+  }
+
+  function showNotif(title, text) {
+    setNotification({ title, text });
+    if (notifTimer.current) clearTimeout(notifTimer.current);
+    notifTimer.current = setTimeout(() => setNotification(null), 4500);
+  }
+
+  // Keyboard listeners for movement + interaction
+  useEffect(() => {
+    if (intro || activeDialogue || showUsb || showComplete) return;
+
+    function onKeyDown(e) {
+      keys.current[e.key] = true;
+
+      // Interact with E or Enter
+      if ((e.key === "e" || e.key === "E" || e.key === "Enter") && nearNpc) {
+        e.preventDefault();
+        setActiveDialogue(nearNpc);
+      }
+      // Journal with J
+      if (e.key === "j" || e.key === "J") {
+        setShowJournal(v => !v);
+      }
+    }
+    function onKeyUp(e) {
+      keys.current[e.key] = false;
+    }
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [intro, activeDialogue, nearNpc, showUsb, showComplete]);
 
   // Movement loop
   useEffect(() => {
-    if (intro || activeDialogue || hasUsb) return;
+    if (intro || activeDialogue || showUsb || showComplete) return;
 
-    let frameId;
+    let rafId;
     function loop() {
-      let dx = 0; let dy = 0;
-      let moving = false;
-      let newDir = null;
+      const k = keys.current;
+      let dx = 0, dy = 0, newDir = null;
 
-      if (keys.current.a || keys.current.q || keys.current.ArrowLeft) { dx -= SPEED; moving = true; newDir = "left"; }
-      else if (keys.current.d || keys.current.ArrowRight) { dx += SPEED; moving = true; newDir = "right"; }
-      else if (keys.current.w || keys.current.z || keys.current.ArrowUp) { dy -= SPEED; moving = true; newDir = "front"; }
-      else if (keys.current.s || keys.current.ArrowDown) { dy += SPEED; moving = true; newDir = "front"; }
+      if (k["ArrowLeft"] || k["a"] || k["q"]) { dx -= SPEED; newDir = "left"; }
+      else if (k["ArrowRight"] || k["d"]) { dx += SPEED; newDir = "right"; }
+      if (k["ArrowUp"] || k["w"] || k["z"]) { dy -= SPEED; newDir = newDir || "up"; }
+      else if (k["ArrowDown"] || k["s"]) { dy += SPEED; newDir = newDir || "down"; }
 
-      if (moving) {
+      const isMoving = dx !== 0 || dy !== 0;
+
+      if (isMoving) {
         animTick.current++;
-        if (animTick.current > 6) {
-          setPlayerAnim(pa => ({
-            dir: newDir || pa.dir,
-            frame: (pa.frame % 7) + 1, // 1 to 7
-            moving: true
-          }));
+        if (animTick.current > 7) {
+          const sp = SPRITES[newDir] || SPRITES.down;
+          frameRef.current = (frameRef.current % sp.frames) + 1;
+          setFrame(frameRef.current);
+          setDir(newDir);
           animTick.current = 0;
         }
-      } else {
-        setPlayerAnim(pa => pa.moving ? { ...pa, frame: 1, moving: false } : pa);
-      }
+        setMoving(true);
 
-      if (dx !== 0 || dy !== 0) {
         setPos(prev => {
-          let nx = prev.x + dx;
-          let ny = prev.y + dy;
-          
-          if (nx < PLAYER_SIZE/2) nx = PLAYER_SIZE/2;
-          if (nx > WORLD_WIDTH - PLAYER_SIZE/2) nx = WORLD_WIDTH - PLAYER_SIZE/2;
-          if (ny < PLAYER_SIZE/2) ny = PLAYER_SIZE/2;
-          if (ny > WORLD_HEIGHT - PLAYER_SIZE/2) ny = WORLD_HEIGHT - PLAYER_SIZE/2;
+          let nx = Math.max(PLAYER_W / 2, Math.min(WORLD_W - PLAYER_W / 2, prev.x + dx));
+          let ny = Math.max(PLAYER_H / 2, Math.min(WORLD_H - PLAYER_H / 2, prev.y + dy));
+
+          // Separate axis collision
+          if (collidesWithObstacles(nx, prev.y)) nx = prev.x;
+          if (collidesWithObstacles(prev.x, ny)) ny = prev.y;
+          if (collidesWithObstacles(nx, ny)) { nx = prev.x; ny = prev.y; }
 
           return { x: nx, y: ny };
         });
+      } else {
+        if (moving) {
+          setMoving(false);
+          frameRef.current = 1;
+          setFrame(1);
+        }
       }
-      
-      frameId = requestAnimationFrame(loop);
-    }
-    frameId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frameId);
-  }, [intro, activeDialogue, hasUsb]);
 
-  // Check distance to NPCs
+      rafId = requestAnimationFrame(loop);
+    }
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [intro, activeDialogue, moving, showUsb, showComplete]);
+
+  // Check NPC proximity
   useEffect(() => {
     if (activeDialogue) return;
-    
     let closest = null;
     let minDist = INTERACT_DIST;
-
     for (const npc of NPCS) {
       const dx = pos.x - npc.x;
       const dy = pos.y - npc.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = npc.id;
-      }
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) { minDist = dist; closest = npc.id; }
     }
-    
-    if (closest !== nearNpc) {
-      setNearNpc(closest);
-    }
-  }, [pos, activeDialogue, nearNpc]);
+    setNearNpc(closest);
+  }, [pos, activeDialogue]);
 
   function handleDialogueComplete() {
     const npc = activeDialogue;
     setActiveDialogue(null);
-    
+
     if (npc === "client2") {
-      showNotification("INDICE OBTENU", "Adam était au Café Nova hier. Il semblait très inquiet.");
-    } else if (npc === "temoin") {
-      setHasUsb(true);
+      addClue("client2_cache");
+      showNotif("INDICE OBTENU", "Client 2 semble cacher quelque chose.");
+    }
+    if (npc === "temoin") {
       addInventoryItem({ id: "usb-key", icon: "USB", name: "Clé USB", detail: "Appartient à Adam" });
-      setTimeout(() => {
-        showNotification("MISSION TERMINÉE", "Vous avez retrouvé le témoin et récupéré la clé USB d'Adam.");
-        setTimeout(() => {
-          onComplete();
-        }, 4000);
-      }, 500);
+      setShowUsb(true);
     }
   }
 
-  function showNotification(title, text) {
-    setNotification({ title, text });
-    setTimeout(() => setNotification(null), 4000);
-  }
+  // Camera
+  let camX = Math.max(0, Math.min(WORLD_W - viewport.w, pos.x - viewport.w / 2));
+  let camY = Math.max(0, Math.min(WORLD_H - viewport.h, pos.y - viewport.h / 2));
 
-  // Calculate camera position
-  let camX = pos.x - viewport.w / 2;
-  let camY = pos.y - viewport.h / 2;
-  
-  if (camX < 0) camX = 0;
-  if (camX > WORLD_WIDTH - viewport.w) camX = WORLD_WIDTH - viewport.w;
-  if (camY < 0) camY = 0;
-  if (camY > WORLD_HEIGHT - viewport.h) camY = WORLD_HEIGHT - viewport.h;
+  // Sprite
+  const sp = SPRITES[dir] || SPRITES.down;
+  let spriteSrc = null;
+  try { spriteSrc = require(`../assets/${sp.folder}/${sp.prefix}${frame}.png`); } catch (e) {}
 
-  return (
-    <div className="mission2-container">
-      {/* Intro Screen */}
-      {intro && (
-        <div className="m2-intro-overlay" style={{ backgroundImage: `url(${require("../assets/Gemini_Generated_Image_zc8opnzc8opnzc8o.jpg")})` }}>
+  // Objective text
+  const objective = clues.has("temoin_fenetre")
+    ? "Retrouvez la personne près de la fenêtre"
+    : "Trouvez quelqu'un qui a vu Adam";
+
+  // ── INTRO SCREEN ──────────────────────────────────────────────────────────
+  if (intro) {
+    return (
+      <div className="mission2-container">
+        <div className="m2-intro-overlay" style={{ backgroundImage: `url(${require("../assets/backgroumd missiom2.png")})` }}>
           <div className="m2-intro-text">
-            <h1>MISSION 2</h1>
+            <div className="m2-intro-mission-tag">MISSION 2</div>
             <h2>Le rendez-vous</h2>
-            <p>Objectif : Retrouver le témoin qui a vu Adam au Café Nova.</p>
+            <p>📱 <strong>LINA :</strong> « Adam était ici hier soir à 21h30. Il aurait parlé à quelqu'un. Cherche des indices avant de poser des questions. »</p>
+            <div className="m2-intro-objective">Objectif : Trouvez quelqu'un qui a vu Adam.</div>
             <button className="m2-intro-btn" onClick={() => setIntro(false)}>Entrer dans le café →</button>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Viewport & Game World */}
+  return (
+    <div className="mission2-container">
+      {/* Viewport */}
       <div className="m2-viewport">
-        {/* HUD (fixed on screen) */}
-        {!intro && (
-          <div className="m2-hud">
-            <div className="m2-hud-title">Objectif</div>
-            <div className="m2-hud-objective">Identifier le témoin</div>
-          </div>
-        )}
-
-        <div className="m2-world" style={{ 
-          backgroundImage: `url(${require("../assets/Gemini_Generated_Image_wf55h9wf55h9wf55.jpg")})`,
-          width: WORLD_WIDTH,
-          height: WORLD_HEIGHT,
-          transform: `translate(${-camX}px, ${-camY}px)`
-        }}>
-
-
-        {/* NPCs */}
-        {!intro && NPCS.map(npc => (
-          <div key={npc.id} className={`m2-npc ${npc.type}`} style={{ left: npc.x, top: npc.y }}>
-            {nearNpc === npc.id && !activeDialogue && (
-              <div className="m2-interact-prompt">[Entrée] Parler</div>
-            )}
-            P
-          </div>
-        ))}
-
-        {/* Player */}
-        {!intro && (() => {
-          let folder = "fromt";
-          let prefix = "avamt ";
-          if (playerAnim.dir === "left" || playerAnim.dir === "right") {
-            folder = "left";
-            prefix = "left";
-          }
-          let spriteSrc = null;
-          try {
-            spriteSrc = require(`../assets/${folder}/${prefix}${playerAnim.frame}.png`);
-          } catch(e) {}
-          
-          const isFlipped = playerAnim.dir === "right";
-          
-          return (
-            <div className="m2-player" style={{ left: pos.x, top: pos.y }}>
-              <div className="m2-player-label">Yanis</div>
-              {spriteSrc && (
-                <img 
-                  src={spriteSrc} 
-                  alt="Yanis" 
-                  className="m2-player-sprite" 
-                  style={{ transform: isFlipped ? "scaleX(-1)" : "none" }} 
-                />
+        {/* World */}
+        <div
+          className="m2-world"
+          style={{
+            backgroundImage: `url(${require("../assets/backgroumd missiom2.png")})`,
+            width: WORLD_W,
+            height: WORLD_H,
+            transform: `translate(${-camX}px, ${-camY}px)`,
+          }}
+        >
+          {/* NPCs */}
+          {NPCS.map(npc => (
+            <div
+              key={npc.id}
+              className={`m2-npc ${npc.type}`}
+              style={{ left: npc.x, top: npc.y, background: npc.color }}
+            >
+              <span className="m2-npc-label">{npc.label}</span>
+              {nearNpc === npc.id && !activeDialogue && (
+                <div className="m2-interact-prompt">[E] Interagir</div>
               )}
             </div>
-          );
-        })()}
+          ))}
+
+          {/* Player */}
+          <div className="m2-player" style={{ left: pos.x, top: pos.y }}>
+            {spriteSrc
+              ? <img
+                  src={spriteSrc}
+                  alt="Yanis"
+                  className="m2-player-sprite"
+                  style={{ transform: dir === "right" ? "none" : dir === "left" ? "none" : "none" }}
+                />
+              : <div className="m2-player-fallback">Y</div>
+            }
+            <div className="m2-player-label">Yanis</div>
+          </div>
+        </div>
+
+        {/* HUD */}
+        <div className="m2-hud">
+          <div className="m2-hud-title">Objectif</div>
+          <div className="m2-hud-objective">{objective}</div>
+        </div>
+
+        {/* Journal button */}
+        <button className="m2-journal-btn" onClick={() => setShowJournal(v => !v)}>
+          Journal [J]
+        </button>
+
+        {/* Controls hint */}
+        <div className="m2-controls-hint">
+          Flèches / ZQSD pour se déplacer · [E] Interagir · [J] Journal
         </div>
       </div>
 
       {/* Dialogue */}
       {activeDialogue && (
-        <DialogueBox 
-          lines={DIALOGUES[activeDialogue]} 
-          onComplete={handleDialogueComplete} 
+        <AdvancedDialogue
+          key={activeDialogue}
+          npcId={activeDialogue}
+          clues={clues}
+          onComplete={handleDialogueComplete}
+          onAddClue={addClue}
         />
       )}
 
@@ -305,6 +718,19 @@ export default function Mission2({ onComplete, addInventoryItem }) {
           <h3>{notification.title}</h3>
           <p>{notification.text}</p>
         </div>
+      )}
+
+      {/* Journal panel */}
+      <Journal clues={clues} visible={showJournal} onClose={() => setShowJournal(false)} />
+
+      {/* USB Obtained */}
+      {showUsb && (
+        <UsbObtained onContinue={() => { setShowUsb(false); setShowComplete(true); }} />
+      )}
+
+      {/* Mission Complete */}
+      {showComplete && (
+        <MissionComplete2 onContinue={onComplete} />
       )}
     </div>
   );
