@@ -5,14 +5,14 @@ import "./Mission2.css";
 // World & Player constants
 // ─────────────────────────────────────────────────────────────────────────────
 const SPEED = 4;
-const PLAYER_W = 90;
-const PLAYER_H = 120;
+const PLAYER_W = 120;
+const PLAYER_H = 160;
 const WORLD_W = 1600;
 const WORLD_H = 900;
 const INTERACT_DIST = 130;
 
 const FEET_W = 40;
-const FEET_H = 18;
+const FEET_H = 20;
 
 // Sprite config
 const SPRITES = {
@@ -33,6 +33,23 @@ const WALKABLE_ZONES = [
   { x: 840, y: 600, w: 130, h: 170 }, // allée droite (client 2 → client 3)
   { x: 450, y: 680, w: 160, h: 80 },  // jonction centre-bas (devant client 1)
   { x: 100, y: 300, w: 140, h: 250 }, // zone d'entrée / porte
+];
+
+// ─── OBJETS BLOQUANTS (blacklist) ──────────────────────────────────────────────
+// Les zones où le joueur NE PEUT PAS marcher même si elles sont dans WALKABLE_ZONES.
+const COLLISION_OBJECTS = [
+  // --- Tables ---
+  { x: 190, y: 560, w: 90, h: 40 }, // table_window (témoin)
+  { x: 520, y: 700, w: 90, h: 40 }, // table_client1
+  { x: 640, y: 640, w: 90, h: 40 }, // table_client2
+  { x: 880, y: 700, w: 90, h: 40 }, // table_client3
+  { x: 1150, y: 500, w: 380, h: 60 }, // bar_counter
+  
+  // --- Chaises (décor bloquant) ---
+  { x: 150, y: 610, w: 30, h: 20 },
+  { x: 480, y: 740, w: 30, h: 20 },
+  { x: 600, y: 680, w: 30, h: 20 },
+  { x: 840, y: 740, w: 30, h: 20 },
 ];
 
 // NPCs — positions in world space matching the café image characters (1600x900)
@@ -532,7 +549,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
           let nextX = prev.x;
           let nextY = prev.y;
 
-          // Système whitelist : les pieds du joueur doivent être dans la zone
+          // Système whitelist : les pieds du joueur doivent être dans la zone ET hors des objets bloquants
           const inZone = (px, py) => {
             const feetX = px - FEET_W / 2;
             const feetY = py - FEET_H; 
@@ -543,10 +560,33 @@ export default function Mission2({ onComplete, addInventoryItem }) {
               [feetX, feetY + FEET_H],
               [feetX + FEET_W, feetY + FEET_H],
             ];
-            return corners.every(([cx, cy]) => WALKABLE_ZONES.some(z =>
+
+            // 1. Check if all corners are in at least one walkable zone
+            const insideWalkable = corners.every(([cx, cy]) => WALKABLE_ZONES.some(z =>
               cx >= z.x && cx <= z.x + z.w &&
               cy >= z.y && cy <= z.y + z.h
             ));
+            if (!insideWalkable) return false;
+
+            // 2. Check if feet overlap with any collision object (blacklist)
+            // A rect overlaps another if: ax < bx+bw && ax+aw > bx-bw/2 ... wait, user used center-based collision.
+            // Let's use standard top-left AABB since COLLISION_OBJECTS is x,y (center) with w,h
+            // Converting COLLISION_OBJECTS x,y from center to top-left for standard AABB:
+            const hitsObject = COLLISION_OBJECTS.some(obj => {
+              const objLeft = obj.x - obj.w / 2;
+              const objRight = obj.x + obj.w / 2;
+              const objTop = obj.y - obj.h / 2;
+              const objBottom = obj.y + obj.h / 2;
+
+              return (
+                feetX < objRight &&
+                feetX + FEET_W > objLeft &&
+                feetY < objBottom &&
+                feetY + FEET_H > objTop
+              );
+            });
+
+            return !hitsObject;
           };
 
           if (dx !== 0 && inZone(prev.x + dx, prev.y)) nextX = prev.x + dx;
