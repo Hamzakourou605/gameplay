@@ -223,26 +223,6 @@ const DIALOGUES = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Collision helper
-// ─────────────────────────────────────────────────────────────────────────────
-function collidesWithObstacles(nx, ny) {
-  const hw = PLAYER_W / 2;
-  const hh = PLAYER_H / 2;
-  // Use a narrower hitbox for feet (bottom third of player)
-  const px1 = nx - hw * 0.5;
-  const px2 = nx + hw * 0.5;
-  const py1 = ny + hh * 0.3;
-  const py2 = ny + hh;
-
-  for (const o of OBSTACLES) {
-    if (px2 > o.x && px1 < o.x + o.w && py2 > o.y && py1 < o.y + o.h) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Advanced Dialogue Component with choices
 // ─────────────────────────────────────────────────────────────────────────────
 function AdvancedDialogue({ npcId, clues, onComplete, onAddClue }) {
