@@ -8,21 +8,15 @@
   font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
 }
 
-.m2-viewport {
+.m2-scene {
   position: relative;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
-  background: #0a0c10;
-}
-
-.m2-world {
-  position: absolute;
-  top: 0;
-  left: 0;
   background-size: cover;
-  background-position: top left;
-  will-change: transform;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #000;
+  overflow: hidden;
 }
 
 /* ─── Intro Screen ───────────────────────────────────────────────────── */
