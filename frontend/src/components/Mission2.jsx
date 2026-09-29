@@ -36,38 +36,46 @@ const COLLISION_OBJECTS = [
   { x: 840, y: 740, w: 30, h: 20 },
 ];
 
-// NPCs — positions in world space matching the café image characters (1600x900)
+// NPCs — zones cliquables positionnées sur chaque personnage de l'image (1600x900)
 const NPCS = [
   {
     id: "temoin",
     label: "Témoin",
-    x: 280,
-    y: 480,
-    color: "transparent",
+    // personnage en haut à gauche, près de la fenêtre (capuche sombre)
+    x: 230,
+    y: 260,
+    w: 120,
+    h: 190,
     type: "witness",
   },
   {
     id: "client1",
     label: "Client 1",
-    x: 500,
-    y: 720,
-    color: "transparent",
+    // personnage assis en bas au centre (veste noire, table lumière)
+    x: 430,
+    y: 490,
+    w: 120,
+    h: 190,
     type: "client",
   },
   {
     id: "client2",
     label: "Client 2",
-    x: 750,
-    y: 550,
-    color: "transparent",
+    // personnage à droite avec journal
+    x: 680,
+    y: 300,
+    w: 120,
+    h: 190,
     type: "client",
   },
   {
     id: "client3",
     label: "Client 3",
-    x: 1050,
-    y: 720,
-    color: "transparent",
+    // personnage en bas à droite (veste sombre, table)
+    x: 870,
+    y: 390,
+    w: 120,
+    h: 190,
     type: "client",
   },
 ];
@@ -541,26 +549,26 @@ export default function Mission2({ onComplete, addInventoryItem }) {
             transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
           }}
         >
-          {/* NPCs */}
+          {/* NPCs — zones cliquables transparentes posées sur chaque personnage */}
           {NPCS.map(npc => (
             <div
               key={npc.id}
-              className={`m2-npc ${npc.type}`}
+              className={`m2-npc-hotspot ${npc.type}`}
               style={{ 
                 left: npc.x, 
-                top: npc.y, 
-                zIndex: Math.floor(npc.y),
-                background: npc.color, 
-                borderColor: npc.color === "transparent" ? "transparent" : "", 
-                boxShadow: npc.color === "transparent" ? "none" : "" 
+                top: npc.y,
+                width: npc.w,
+                height: npc.h,
               }}
               onMouseEnter={() => setHoveredNpc(npc.id)}
               onMouseLeave={() => setHoveredNpc(null)}
-              onClick={() => setActiveDialogue(npc.id)}
+              onClick={() => !activeDialogue && setActiveDialogue(npc.id)}
             >
-              <span className="m2-npc-label" style={{ opacity: npc.color === "transparent" ? 0 : 1 }}>{npc.label}</span>
               {hoveredNpc === npc.id && !activeDialogue && (
-                <div className="m2-interact-prompt">Clic pour interagir</div>
+                <div className="m2-hotspot-prompt">
+                  <span className="m2-hotspot-label">{npc.label}</span>
+                  <span className="m2-hotspot-cta">Cliquer pour parler</span>
+                </div>
               )}
             </div>
           ))}

@@ -100,36 +100,53 @@
   box-shadow: 0 8px 24px rgba(43, 111, 176, 0.5);
 }
 
-
-.m2-npc {
+/* ─── NPC Hotspots (Point & Click) ──────────────────────────────────── */
+.m2-npc-hotspot {
   position: absolute;
-  width: 40px;
-  height: 54px;
-  border-radius: 50% 50% 40% 40%;
-  transform: translate(-50%, -100%);
-  z-index: 15;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  border: 2px solid rgba(255,255,255,0.3);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.6);
   cursor: pointer;
-  transition: transform 0.2s;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  z-index: 20;
 }
-.m2-npc:hover {
-  transform: translate(-50%, -100%) scale(1.1);
-  border-color: rgba(255,255,255,0.8);
+.m2-npc-hotspot:hover {
+  border-color: rgba(255, 200, 80, 0.7);
+  box-shadow: 0 0 18px 4px rgba(255, 200, 80, 0.25), inset 0 0 12px rgba(255, 200, 80, 0.1);
 }
-.m2-npc-label {
+.m2-hotspot-prompt {
   position: absolute;
-  top: -22px;
-  font-size: 10px;
-  background: rgba(0,0,0,0.65);
-  color: rgba(255,255,255,0.85);
-  padding: 2px 7px;
-  border-radius: 4px;
+  top: -58px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 10, 20, 0.92);
+  border: 1px solid rgba(255, 200, 80, 0.5);
+  border-radius: 8px;
+  padding: 6px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   white-space: nowrap;
+  pointer-events: none;
+  animation: fadeInUp 0.15s ease-out;
 }
+.m2-hotspot-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd977;
+  letter-spacing: 0.06em;
+}
+.m2-hotspot-cta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+
+
 .m2-npc.witness {
   border-color: rgba(180, 120, 240, 0.7);
   box-shadow: 0 0 16px rgba(180, 100, 240, 0.35);
