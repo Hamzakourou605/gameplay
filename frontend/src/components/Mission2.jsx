@@ -28,7 +28,7 @@ const COLLISION_OBJECTS = [
   { x: 640, y: 640, w: 90, h: 40 }, // table_client2
   { x: 880, y: 700, w: 90, h: 40 }, // table_client3
   { x: 1150, y: 500, w: 380, h: 60 }, // bar_counter
-  
+
   // --- Chaises (décor bloquant) ---
   { x: 150, y: 610, w: 30, h: 20 },
   { x: 480, y: 740, w: 30, h: 20 },
@@ -42,40 +42,40 @@ const NPCS = [
     id: "temoin",
     label: "Témoin",
     // personnage en haut à gauche, près de la fenêtre (capuche sombre)
-    x: 230,
-    y: 260,
-    w: 120,
-    h: 190,
+    px: 14.375,
+    py: 28.889,
+    pw: 7.5,
+    ph: 21.111,
     type: "witness",
   },
   {
     id: "client1",
     label: "Client 1",
     // personnage assis en bas au centre (veste noire, table lumière)
-    x: 430,
-    y: 490,
-    w: 120,
-    h: 190,
+    px: 26.875,
+    py: 54.444,
+    pw: 7.5,
+    ph: 21.111,
     type: "client",
   },
   {
     id: "client2",
     label: "Client 2",
     // personnage à droite avec journal
-    x: 680,
-    y: 300,
-    w: 120,
-    h: 190,
+    px: 42.5,
+    py: 33.333,
+    pw: 7.5,
+    ph: 21.111,
     type: "client",
   },
   {
     id: "client3",
     label: "Client 3",
     // personnage en bas à droite (veste sombre, table)
-    x: 870,
-    y: 390,
-    w: 120,
-    h: 190,
+    px: 54.375,
+    py: 43.333,
+    pw: 7.5,
+    ph: 21.111,
     type: "client",
   },
 ];
@@ -250,9 +250,9 @@ function AdvancedDialogue({ npcId, clues, onComplete, onAddClue }) {
 
   const currentLines = phase === "lines" ? getLines()
     : phase === "response" && choiceIdx !== null ? (data.choices?.[choiceIdx]?.response || [])
-    : phase === "ending" ? (data.ending || [])
-    : phase === "intro" ? (data.intro || [])
-    : [];
+      : phase === "ending" ? (data.ending || [])
+        : phase === "intro" ? (data.intro || [])
+          : [];
 
   const currentLine = currentLines[lineIdx] || currentLines[0];
 
@@ -409,9 +409,9 @@ function MissionComplete2({ onContinue }) {
 // Journal Panel
 // ─────────────────────────────────────────────────────────────────────────────
 const CLUE_LABELS = {
-  fenetre:        "Une personne se trouvait près de la fenêtre",
-  table7:         "Adam était à la table 7",
-  client2_cache:  "Client 2 semble cacher quelque chose",
+  fenetre: "Une personne se trouvait près de la fenêtre",
+  table7: "Adam était à la table 7",
+  client2_cache: "Client 2 semble cacher quelque chose",
   temoin_fenetre: "Le témoin est près de la fenêtre",
 };
 
@@ -506,7 +506,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
   const scaleX = viewport.w / WORLD_W;
   const scaleY = viewport.h / WORLD_H;
   const scale = Math.max(scaleX, scaleY);
-  
+
   const offsetX = (viewport.w - WORLD_W * scale) / 2;
   const offsetY = (viewport.h - WORLD_H * scale) / 2;
 
@@ -536,43 +536,34 @@ export default function Mission2({ onComplete, addInventoryItem }) {
 
   return (
     <div className="mission2-container">
-      {/* Viewport */}
-      <div className="m2-viewport">
-        {/* World */}
-        <div
-          className="m2-world"
-          style={{
-            backgroundImage: `url(${require("../assets/missiom 2 backgroumd .png")})`,
-            width: WORLD_W,
-            height: WORLD_H,
-            transformOrigin: "0 0",
-            transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
-          }}
-        >
-          {/* NPCs — zones cliquables transparentes posées sur chaque personnage */}
-          {NPCS.map(npc => (
-            <div
-              key={npc.id}
-              className={`m2-npc-hotspot ${npc.type}`}
-              style={{ 
-                left: npc.x, 
-                top: npc.y,
-                width: npc.w,
-                height: npc.h,
-              }}
-              onMouseEnter={() => setHoveredNpc(npc.id)}
-              onMouseLeave={() => setHoveredNpc(null)}
-              onClick={() => !activeDialogue && setActiveDialogue(npc.id)}
-            >
-              {hoveredNpc === npc.id && !activeDialogue && (
-                <div className="m2-hotspot-prompt">
-                  <span className="m2-hotspot-label">{npc.label}</span>
-                  <span className="m2-hotspot-cta">Cliquer pour parler</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+      {/* === SCENE PRINCIPALE === */}
+      <div
+        className="m2-scene"
+        style={{ backgroundImage: `url(${require("../assets/missiom2.png")})` }}
+      >
+        {/* NPCs — hotspots en % de la scène */}
+        {NPCS.map(npc => (
+          <div
+            key={npc.id}
+            className={`m2-npc-hotspot ${npc.type}`}
+            style={{
+              left: `${npc.px}%`,
+              top: `${npc.py}%`,
+              width: `${npc.pw}%`,
+              height: `${npc.ph}%`,
+            }}
+            onMouseEnter={() => setHoveredNpc(npc.id)}
+            onMouseLeave={() => setHoveredNpc(null)}
+            onClick={() => !activeDialogue && setActiveDialogue(npc.id)}
+          >
+            {hoveredNpc === npc.id && !activeDialogue && (
+              <div className="m2-hotspot-prompt">
+                <span className="m2-hotspot-label">{npc.label}</span>
+                <span className="m2-hotspot-cta">Cliquer pour parler</span>
+              </div>
+            )}
+          </div>
+        ))}
 
         {/* HUD */}
         <div className="m2-hud">
@@ -587,7 +578,7 @@ export default function Mission2({ onComplete, addInventoryItem }) {
 
         {/* Controls hint */}
         <div className="m2-controls-hint">
-          Clic pour interagir avec un personnage · [J] Journal
+          Clic sur un personnage pour lui parler · [J] Journal
         </div>
       </div>
 
